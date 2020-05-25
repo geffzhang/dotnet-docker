@@ -1,63 +1,66 @@
 #!/usr/bin/env pwsh
-[cmdletbinding()]
 param(
-    [switch]$UseImageCache,
-    [string]$VersionFilter,
-    [string]$ArchitectureFilter,
-    [string]$OSFilter
+    # Version of .NET Core to filter by
+    [string]$Version = "*",
+
+    # Name of OS to filter by
+    [string]$OS,
+
+    # Type of architecture to filter by
+    [string]$Architecture,
+
+    # Additional custom path filters (overrides Version)
+    [string[]]$Paths,
+
+    # Additional args to pass to ImageBuilder
+    [string]$OptionalImageBuilderArgs,
+
+    # Execution mode of the script
+    [ValidateSet("BuildAndTest", "Build", "Test")]
+    [string]$Mode = "BuildAndTest",
+
+    # Categories of tests to run
+    [ValidateSet("runtime", "runtime-deps", "aspnet", "sdk", "sample", "image-size")]
+    [string[]]$TestCategories = @("runtime", "runtime-deps", "aspnet", "sdk", "sample", "image-size")
 )
 
-Set-StrictMode -Version Latest
-$ErrorActionPreference = 'Stop'
+if ($Mode -eq "BuildAndTest" -or $Mode -eq "Build") {
+    # Build the product images
+    & ./eng/common/build.ps1 `
+        -Version $Version `
+        -OS $OS `
+        -Architecture $Architecture `
+        -Paths $Paths `
+        -OptionalImageBuilderArgs $OptionalImageBuilderArgs
 
-$(docker version) | % { Write-Host "$_" }
-$activeOS = docker version -f "{{ .Server.Os }}"
+    $activeOS = docker version -f "{{ .Server.Os }}"
+    if ($activeOS -eq "windows" -and -not $OS) {
+        Write-Host "Setting OS to match local Windows host version"
+        $windowsReleaseId = (Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion").ReleaseId
+        $OS = "nanoserver-$windowsReleaseId"
+    }
 
-if ($UseImageCache) {
-    $optionalDockerBuildArgs = ""
+    # Build the sample images
+    & ./eng/common/build.ps1 `
+        -Version $Version `
+        -OS $OS `
+        -Architecture $Architecture `
+        -Paths $Paths `
+        -OptionalImageBuilderArgs $OptionalImageBuilderArgs `
+        -Manifest manifest.samples.json
 }
-else {
-    $optionalDockerBuildArgs = "--no-cache"
+if ($Mode -eq "BuildAndTest" -or $Mode -eq "Test") {
+
+    $localTestCategories = $TestCategories
+
+    if ($Version -ne "*" -and $TestCategories.Contains("sample")) {
+        $localTestCategories = $TestCategories | where { $_ -ne "sample" }
+        Write-Warning "Skipping sample image testing since Version was set"
+    }
+
+    & ./tests/run-tests.ps1 `
+        -Version $Version `
+        -OS $OS `
+        -Architecture $Architecture `
+        -TestCategories $localTestCategories
 }
-
-$manifest = Get-Content "manifest.json" | ConvertFrom-Json
-$manifestRepo = $manifest.Repos[0]
-$builtTags = @()
-
-$buildFilter = "*"
-if (-not [string]::IsNullOrEmpty($versionFilter))
-{
-    $buildFilter = "$versionFilter/$buildFilter"
-}
-if (-not [string]::IsNullOrEmpty($OsFilter))
-{
-    $buildFilter = "$buildFilter/$OsFilter/*"
-}
-
-
-$manifestRepo.Images |
-ForEach-Object {
-    $images = $_
-    $_.Platforms |
-        Where-Object { $_.os -eq "$activeOS" } |
-        Where-Object { [string]::IsNullOrEmpty($buildFilter) -or $_.dockerfile -like "$buildFilter" } |
-        Where-Object { ( [string]::IsNullOrEmpty($ArchitectureFilter) -and -not [bool]($_.PSobject.Properties.name -match "architecture"))`
-            -or ( [bool]($_.PSobject.Properties.name -match "architecture") -and $_.architecture -eq "$ArchitectureFilter" ) } |
-        ForEach-Object {
-            $dockerfilePath = $_.dockerfile
-            $tags = [array]($_.Tags | ForEach-Object { $_.PSobject.Properties })
-            $qualifiedTags = $tags | ForEach-Object { $manifestRepo.Name + ':' + $_.Name}
-            $formattedTags = $qualifiedTags -join ', '
-            Write-Host "--- Building $formattedTags from $dockerfilePath ---"
-            Invoke-Expression "docker build $optionalDockerBuildArgs -t $($qualifiedTags -join ' -t ') $dockerfilePath"
-            if ($LastExitCode -ne 0) {
-                throw "Failed building $formattedTags"
-            }
-
-            $builtTags += $formattedTags
-        }
-}
-
-./tests/run-tests.ps1 -VersionFilter $VersionFilter -ArchitectureFilter $ArchitectureFilter -OSFilter $OSFilter -IsLocalRun
-Write-Host "Tags built and tested:`n$($builtTags | Out-String)"
-
