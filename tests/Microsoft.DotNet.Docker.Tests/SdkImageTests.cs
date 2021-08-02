@@ -20,7 +20,7 @@ namespace Microsoft.DotNet.Docker.Tests
     [Trait("Category", "sdk")]
     public class SdkImageTests : ProductImageTests
     {
-        private static readonly Dictionary<string, IEnumerable<SdkContentFileInfo>> sdkContentsCache =
+        private static readonly Dictionary<string, IEnumerable<SdkContentFileInfo>> s_sdkContentsCache =
             new Dictionary<string, IEnumerable<SdkContentFileInfo>>();
 
         public SdkImageTests(ITestOutputHelper outputHelper)
@@ -45,17 +45,18 @@ namespace Microsoft.DotNet.Docker.Tests
             base.VerifyCommonInsecureFiles(imageData);
         }
 
-        [Theory]
+        [DotNetTheory]
         [MemberData(nameof(GetImageData))]
         public void VerifyEnvironmentVariables(ProductImageData imageData)
         {
-            List<EnvironmentVariableInfo> variables = new List<EnvironmentVariableInfo>();
-            variables.AddRange(GetCommonEnvironmentVariables());
-
             string aspnetUrlsValue = imageData.Version.Major < 3 ? "http://+:80" : string.Empty;
-            variables.Add(new EnvironmentVariableInfo("ASPNETCORE_URLS", aspnetUrlsValue));
-            variables.Add(new EnvironmentVariableInfo("DOTNET_USE_POLLING_FILE_WATCHER", "true"));
-            variables.Add(new EnvironmentVariableInfo("NUGET_XMLDOC_MODE", "skip"));
+            List<EnvironmentVariableInfo> variables = new()
+            {
+                new EnvironmentVariableInfo("ASPNETCORE_URLS", aspnetUrlsValue),
+                new EnvironmentVariableInfo("DOTNET_USE_POLLING_FILE_WATCHER", "true"),
+                new EnvironmentVariableInfo("NUGET_XMLDOC_MODE", "skip")
+            };
+            variables.AddRange(GetCommonEnvironmentVariables());
 
             if (imageData.Version.Major >= 3)
             {
@@ -74,6 +75,13 @@ namespace Microsoft.DotNet.Docker.Tests
                 variables.Add(RuntimeImageTests.GetRuntimeVersionVariableInfo(imageData, DockerHelper));
             }
 
+            if (imageData.Version.Major >= 6)
+            {
+                variables.Add(new EnvironmentVariableInfo("DOTNET_GENERATE_ASPNET_CERTIFICATE", "false"));
+                variables.Add(new EnvironmentVariableInfo("DOTNET_NOLOGO", "true"));
+                variables.Add(new EnvironmentVariableInfo("Logging__Console__FormatterName", string.Empty));
+            }
+
             if (imageData.SdkOS.StartsWith(OS.AlpinePrefix))
             {
                 variables.Add(new EnvironmentVariableInfo("DOTNET_SYSTEM_GLOBALIZATION_INVARIANT", "false"));
@@ -85,10 +93,10 @@ namespace Microsoft.DotNet.Docker.Tests
                 }
             }
 
-            EnvironmentVariableInfo.Validate(variables, DotNetImageType.SDK, imageData, DockerHelper);
+            EnvironmentVariableInfo.Validate(variables, imageData.GetImage(DotNetImageType.SDK, DockerHelper), imageData, DockerHelper);
         }
 
-        [Theory]
+        [DotNetTheory]
         [MemberData(nameof(GetImageData))]
         public void VerifyPackageCache(ProductImageData imageData)
         {
@@ -119,19 +127,19 @@ namespace Microsoft.DotNet.Docker.Tests
             }
         }
 
-        [Theory]
+        [DotNetTheory]
         [MemberData(nameof(GetImageData))]
         public void VerifyPowerShellScenario_DefaultUser(ProductImageData imageData)
         {
             PowerShellScenario_Execute(imageData, null);
         }
 
-        [Theory]
+        [DotNetTheory]
         [MemberData(nameof(GetImageData))]
         public void VerifyPowerShellScenario_NonDefaultUser(ProductImageData imageData)
         {
-            var optRunArgs = "-u 12345:12345"; // Linux containers test as non-root user
-            if (imageData.OS.Contains("nanoserver", StringComparison.OrdinalIgnoreCase))
+            string optRunArgs = "-u 12345:12345"; // Linux containers test as non-root user
+            if (!DockerHelper.IsLinuxContainerModeEnabled)
             {
                 // windows containers test as Admin, default execution is as ContainerUser
                 optRunArgs = "-u ContainerAdministrator ";
@@ -143,10 +151,29 @@ namespace Microsoft.DotNet.Docker.Tests
         /// <summary>
         /// Verifies that the dotnet folder contents of an SDK container match the contents in the official SDK archive file.
         /// </summary>
-        [Theory]
+        [DotNetTheory]
         [MemberData(nameof(GetImageData))]
         public async Task VerifyDotnetFolderContents(ProductImageData imageData)
         {
+            // Disable this test for Arm-based Alpine on 6.0 until PowerShell has support (https://github.com/PowerShell/PowerShell/issues/14667, https://github.com/PowerShell/PowerShell/issues/12937)
+            if (imageData.Version.Major == 6 && imageData.OS.Contains("alpine") && imageData.IsArm)
+            {
+                return;
+            }
+
+            // Disable test on Windows due to PowerShell crash (https://github.com/dotnet/runtime/issues/53298)
+            if (imageData.Version.Major == 6 && !DockerHelper.IsLinuxContainerModeEnabled)
+            {
+                return;
+            }
+
+            // Skip test on CBL-Mariner for 6.0. Since installation is done via RPM package, we just need to verify the package installation
+            // was done (handled by VerifyPackageInstallation test). There's no need to check the actual contents of the package.
+            if (imageData.Version.Major == 6 && imageData.OS.Contains("cbl-mariner"))
+            {
+                return;
+            }
+
             if (!(imageData.Version.Major >= 5 ||
                 (imageData.Version.Major >= 3 &&
                     (imageData.SdkOS.StartsWith(OS.AlpinePrefix) || !DockerHelper.IsLinuxContainerModeEnabled))))
@@ -160,32 +187,28 @@ namespace Microsoft.DotNet.Docker.Tests
             bool hasCountDifference = expectedDotnetFiles.Count() != actualDotnetFiles.Count();
 
             bool hasFileContentDifference = false;
-            
-            // Skip file comparisons for 3.1 until https://github.com/dotnet/sdk/issues/11327 is fixed.
-            if (imageData.Version.Major != 3)
+
+            int fileCount = expectedDotnetFiles.Count();
+            for (int i = 0; i < fileCount; i++)
             {
-                int fileCount = expectedDotnetFiles.Count();
-                for (int i = 0; i < fileCount; i++)
+                if (expectedDotnetFiles.ElementAt(i).CompareTo(actualDotnetFiles.ElementAt(i)) != 0)
                 {
-                    if (expectedDotnetFiles.ElementAt(i).CompareTo(actualDotnetFiles.ElementAt(i)) != 0)
-                    {
-                        hasFileContentDifference = true;
-                        break;
-                    }
+                    hasFileContentDifference = true;
+                    break;
                 }
             }
 
             if (hasCountDifference || hasFileContentDifference)
             {
-                OutputHelper.WriteLine(String.Empty);
+                OutputHelper.WriteLine(string.Empty);
                 OutputHelper.WriteLine("EXPECTED FILES:");
                 foreach (SdkContentFileInfo file in expectedDotnetFiles)
                 {
                     OutputHelper.WriteLine($"Path: {file.Path}");
                     OutputHelper.WriteLine($"Checksum: {file.Sha512}");
                 }
-                
-                OutputHelper.WriteLine(String.Empty);
+
+                OutputHelper.WriteLine(string.Empty);
                 OutputHelper.WriteLine("ACTUAL FILES:");
                 foreach (SdkContentFileInfo file in actualDotnetFiles)
                 {
@@ -196,6 +219,28 @@ namespace Microsoft.DotNet.Docker.Tests
 
             Assert.Equal(expectedDotnetFiles.Count(), actualDotnetFiles.Count());
             Assert.False(hasFileContentDifference, "There are file content differences. Check the log output.");
+        }
+
+        [DotNetTheory]
+        [MemberData(nameof(GetImageData))]
+        public void VerifyPackageInstallation(ProductImageData imageData)
+        {
+            if (!(imageData.OS.Contains("cbl-mariner") && imageData.Version.Major >= 6))
+            {
+                return;
+            }
+
+            VerifyExpectedInstalledRpmPackages(
+                imageData,
+                new string[]
+                {
+                    $"dotnet-sdk-{imageData.VersionString}",
+                    $"dotnet-targeting-pack-{imageData.VersionString}",
+                    $"aspnetcore-targeting-pack-{imageData.VersionString}",
+                    $"dotnet-apphost-pack-{imageData.VersionString}",
+                    $"netstandard-targeting-pack-2.1"
+                }
+                .Concat(AspnetImageTests.GetExpectedRpmPackagesInstalled(imageData)));
         }
 
         private IEnumerable<SdkContentFileInfo> GetActualSdkContents(ProductImageData imageData)
@@ -247,7 +292,7 @@ namespace Microsoft.DotNet.Docker.Tests
             {
                 using SHA512 sha512 = SHA512.Create();
                 byte[] sha512HashBytes = sha512.ComputeHash(File.ReadAllBytes(file.FullName));
-                string sha512Hash = BitConverter.ToString(sha512HashBytes).Replace("-", String.Empty);
+                string sha512Hash = BitConverter.ToString(sha512HashBytes).Replace("-", string.Empty);
                 yield return new SdkContentFileInfo(
                     file.FullName.Substring(tempFolderContext.Path.Length), sha512Hash);
             }
@@ -276,7 +321,7 @@ namespace Microsoft.DotNet.Docker.Tests
             string sdkUrl =
                 $"https://dotnetcli.azureedge.net/dotnet/Sdk/{sdkVersion}/dotnet-sdk-{sdkVersion}-{osType}-{architecture}.{fileType}";
 
-            if (!sdkContentsCache.TryGetValue(sdkUrl, out IEnumerable<SdkContentFileInfo> files))
+            if (!s_sdkContentsCache.TryGetValue(sdkUrl, out IEnumerable<SdkContentFileInfo> files))
             {
                 string sdkFile = Path.GetTempFileName();
 
@@ -287,7 +332,7 @@ namespace Microsoft.DotNet.Docker.Tests
                     .OrderBy(file => file.Path)
                     .ToArray();
 
-                sdkContentsCache.Add(sdkUrl, files);
+                s_sdkContentsCache.Add(sdkUrl, files);
             }
 
             return files;
@@ -298,6 +343,13 @@ namespace Microsoft.DotNet.Docker.Tests
             if (imageData.Version.Major < 3)
             {
                 OutputHelper.WriteLine("PowerShell does not exist in pre-3.0 images, skip testing");
+                return;
+            }
+
+            // Disable this test for Arm-based Alpine on 6.0 until PowerShell has support (https://github.com/PowerShell/PowerShell/issues/14667, https://github.com/PowerShell/PowerShell/issues/12937)
+            if (imageData.Version.Major == 6 && imageData.OS.Contains("alpine") && imageData.IsArm)
+            {
+                OutputHelper.WriteLine("PowerShell does not have Alpine arm images, skip testing");
                 return;
             }
 
@@ -362,8 +414,8 @@ namespace Microsoft.DotNet.Docker.Tests
             {
                 return path
                     .Replace("\\", "/")
-                    .Replace("/usr/share/dotnet", String.Empty, StringComparison.OrdinalIgnoreCase)
-                    .Replace("c:/program files/dotnet", String.Empty, StringComparison.OrdinalIgnoreCase)
+                    .Replace("/usr/share/dotnet", string.Empty, StringComparison.OrdinalIgnoreCase)
+                    .Replace("c:/program files/dotnet", string.Empty, StringComparison.OrdinalIgnoreCase)
                     .TrimStart('/')
                     .ToLower();
             }

@@ -15,20 +15,20 @@ namespace Microsoft.DotNet.Docker.Tests
 {
     public abstract class ImageData
     {
-        private List<string> _pulledImages = new List<string>();
+        private readonly List<string> _pulledImages = new List<string>();
 
         public Arch Arch { get; set; }
         public bool IsArm => Arch == Arch.Arm || Arch == Arch.Arm64;
         public string OS { get; set; }
 
-        private static readonly Lazy<JObject> ImageInfoData;
+        private static readonly Lazy<JObject> s_imageInfoData;
 
         static ImageData()
         {
-            ImageInfoData = new Lazy<JObject>(() =>
+            s_imageInfoData = new Lazy<JObject>(() =>
             {
                 string imageInfoPath = Environment.GetEnvironmentVariable("IMAGE_INFO_PATH");
-                if (!String.IsNullOrEmpty(imageInfoPath))
+                if (!string.IsNullOrEmpty(imageInfoPath))
                 {
                     string imageInfoContents = File.ReadAllText(imageInfoPath);
                     return JsonConvert.DeserializeObject<JObject>(imageInfoContents);
@@ -45,7 +45,14 @@ namespace Microsoft.DotNet.Docker.Tests
 
                 if (Arch == Arch.Arm)
                 {
-                    rid = "linux-arm";
+                    if (OS.StartsWith(Tests.OS.AlpinePrefix))
+                    {
+                        rid = "linux-musl-arm";
+                    }
+                    else
+                    {
+                        rid = "linux-arm";
+                    }
                 }
                 else if (Arch == Arch.Arm64)
                 {
@@ -75,9 +82,9 @@ namespace Microsoft.DotNet.Docker.Tests
 
         public static string GenerateContainerName(string prefix) => $"{prefix}-{DateTime.Now.ToFileTime()}";
 
-        protected void PullImageIfNecessary(string imageName, DockerHelper dockerHelper)
+        protected void PullImageIfNecessary(string imageName, DockerHelper dockerHelper, bool allowPull = false)
         {
-            if (Config.PullImages && !_pulledImages.Contains(imageName))
+            if ((Config.PullImages || allowPull) && !_pulledImages.Contains(imageName))
             {
                 dockerHelper.Pull(imageName);
                 _pulledImages.Add(imageName);
@@ -88,7 +95,7 @@ namespace Microsoft.DotNet.Docker.Tests
             }
         }
 
-        public static string GetRepoNameModifier() => $"/core{(Config.IsNightlyRepo ? "-nightly" : string.Empty)}";
+        public static string GetRepoNameModifier() => $"{(Config.IsNightlyRepo ? "/nightly" : string.Empty)}";
 
         public static string GetImageName(string tag, string variantName, string repoNameModifier = null)
         {
@@ -98,19 +105,25 @@ namespace Microsoft.DotNet.Docker.Tests
             return $"{registry}{repo}:{tag}";
         }
 
-        protected string GetTagName(string tagPrefix, string os)
+        protected string GetTagName(string tagPrefix, string os) =>
+            $"{tagPrefix}-{os}{GetArchTagSuffix()}";
+
+        protected virtual string GetArchTagSuffix()
         {
-            string arch = string.Empty;
-            if (Arch == Arch.Arm)
+            if (Arch == Arch.Amd64 && DockerHelper.IsLinuxContainerModeEnabled)
             {
-                arch = "-arm32v7";
+                return "-amd64";
+            }
+            else if (Arch == Arch.Arm)
+            {
+                return "-arm32v7";
             }
             else if (Arch == Arch.Arm64)
             {
-                arch = "-arm64v8";
+                return "-arm64v8";
             }
 
-            return $"{tagPrefix}-{os}{arch}";
+            return string.Empty;
         }
 
         private static string GetRegistryName(string repo, string tag)
@@ -120,9 +133,9 @@ namespace Microsoft.DotNet.Docker.Tests
             // In the case of running this in a local development environment, there would likely be no image info file
             // provided. In that case, the assumption is that the images exist in the staging location.
 
-            if (ImageData.ImageInfoData.Value != null)
+            if (ImageData.s_imageInfoData.Value != null)
             {
-                JObject repoInfo = (JObject)ImageData.ImageInfoData.Value
+                JObject repoInfo = (JObject)ImageData.s_imageInfoData.Value
                     .Value<JArray>("repos")
                     .FirstOrDefault(imageInfoRepo => imageInfoRepo["repo"].ToString() == repo);
 
@@ -144,7 +157,7 @@ namespace Microsoft.DotNet.Docker.Tests
 
         public override string ToString()
         {
-            return this.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance | BindingFlags.FlattenHierarchy)
+            return GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance | BindingFlags.FlattenHierarchy)
                 .Select(propInfo => $"{propInfo.Name}='{propInfo.GetValue(this) ?? "<null>"}'")
                 .Aggregate((working, next) => $"{working}, {next}");
         }

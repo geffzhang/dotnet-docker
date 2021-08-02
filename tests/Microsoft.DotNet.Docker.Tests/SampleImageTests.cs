@@ -16,6 +16,8 @@ namespace Microsoft.DotNet.Docker.Tests
     [Trait("Category", "sample")]
     public class SampleImageTests
     {
+        private static readonly string s_samplesPath = Path.Combine(Config.SourceRepoRoot, "samples");
+
         public SampleImageTests(ITestOutputHelper outputHelper)
         {
             OutputHelper = outputHelper;
@@ -32,19 +34,27 @@ namespace Microsoft.DotNet.Docker.Tests
                 .Select(imageData => new object[] { imageData });
         }
 
-        [Theory]
+        [DotNetTheory]
         [MemberData(nameof(GetImageData))]
         public async Task VerifyDotnetSample(SampleImageData imageData)
         {
+            if (imageData.DockerfileSuffix == "windowsservercore-iis-x64")
+            {
+                return;
+            }
+
             await VerifySampleAsync(imageData, SampleImageType.Dotnetapp, (image, containerName) =>
             {
                 string output = DockerHelper.Run(image, containerName);
-                Assert.StartsWith("Hello from .NET Core!", output);
+                Assert.True(output.Contains("42") || output.StartsWith("Hello"));
+
+                ValidateEnvironmentVariables(imageData, image, SampleImageType.Dotnetapp);
+
                 return Task.CompletedTask;
             });
         }
 
-        [Theory]
+        [DotNetTheory]
         [MemberData(nameof(GetImageData))]
         public async Task VerifyAspnetSample(SampleImageData imageData)
         {
@@ -67,6 +77,8 @@ namespace Microsoft.DotNet.Docker.Tests
                     {
                         await ImageScenarioVerifier.VerifyHttpResponseFromContainerAsync(containerName, DockerHelper, OutputHelper);
                     }
+
+                    ValidateEnvironmentVariables(imageData, image, SampleImageType.Aspnetapp);
                 }
                 finally
                 {
@@ -80,7 +92,7 @@ namespace Microsoft.DotNet.Docker.Tests
         {
             string appTag = SampleImageData.GetImageName("complexapp-local-app");
             string testTag = SampleImageData.GetImageName("complexapp-local-test");
-            string sampleFolder = $"samples/complexapp";
+            string sampleFolder = Path.Combine(s_samplesPath, "complexapp");
             string dockerfilePath = $"{sampleFolder}/Dockerfile";
             string testContainerName = ImageData.GenerateContainerName("sample-complex-test");
             string tempDir = null;
@@ -111,9 +123,9 @@ namespace Microsoft.DotNet.Docker.Tests
 
                 // Open the test log file and verify the tests passed
                 XDocument doc = XDocument.Load(testLogFile);
-                var summary = doc.Root.Element(XName.Get("ResultSummary", doc.Root.Name.NamespaceName));
+                XElement summary = doc.Root.Element(XName.Get("ResultSummary", doc.Root.Name.NamespaceName));
                 Assert.Equal("Completed", summary.Attribute("outcome").Value);
-                var counters = summary.Element(XName.Get("Counters", doc.Root.Name.NamespaceName));
+                XElement counters = summary.Element(XName.Get("Counters", doc.Root.Name.NamespaceName));
                 Assert.Equal("2", counters.Attribute("total").Value);
                 Assert.Equal("2", counters.Attribute("passed").Value);
             }
@@ -141,7 +153,7 @@ namespace Microsoft.DotNet.Docker.Tests
             {
                 if (!imageData.IsPublished)
                 {
-                    string sampleFolder = $"samples/{imageType}";
+                    string sampleFolder = Path.Combine(s_samplesPath, imageType);
                     string dockerfilePath = $"{sampleFolder}/Dockerfile.{imageData.DockerfileSuffix}";
 
                     DockerHelper.Build(image, dockerfilePath, contextDir: sampleFolder, pull: Config.PullImages);
@@ -157,6 +169,23 @@ namespace Microsoft.DotNet.Docker.Tests
                     DockerHelper.DeleteImage(image);
                 }
             }
+        }
+
+        private void ValidateEnvironmentVariables(SampleImageData imageData, string image, SampleImageType imageType)
+        {
+            List<EnvironmentVariableInfo> variables = new List<EnvironmentVariableInfo>();
+            variables.AddRange(ProductImageTests.GetCommonEnvironmentVariables());
+
+            if (imageType == SampleImageType.Aspnetapp)
+            {
+                variables.Add(new EnvironmentVariableInfo("ASPNETCORE_URLS", "http://+:80"));
+            }
+            
+            EnvironmentVariableInfo.Validate(
+                variables,
+                image,
+                imageData,
+                DockerHelper);
         }
     }
 }

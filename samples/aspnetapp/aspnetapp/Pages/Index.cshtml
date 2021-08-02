@@ -6,13 +6,15 @@
 @{
     ViewData["Title"] = "Home page";
     var process = Process.GetCurrentProcess();
+    var hostName = System.Net.Dns.GetHostName();
+    var ipList = await System.Net.Dns.GetHostAddressesAsync(hostName);
 }
 
 <div class="text-center">
-    <h1 class="display-4">Welcome to .NET Core</h1>
+    <h1 class="display-4">Welcome to .NET</h1>
 
     <h5>Environment</h5>
-    <p>@RuntimeInformation.FrameworkDescription</p>
+    <p>@RuntimeInformation.FrameworkDescription (@RuntimeInformation.ProcessArchitecture)</p>
     <p>@RuntimeInformation.OSDescription</p>
 </div>
 
@@ -27,13 +29,13 @@
             <td>CPU cores</td>
             <td>@Environment.ProcessorCount</td>
         </tr>
-    @if (RuntimeInformation.OSDescription.StartsWith("Linux") && Directory.Exists("/sys/fs/cgroup/memory"))
-    {
-        <tr>
-            <td>cgroup memory usage</td>
-            <td>@System.IO.File.ReadAllLines("/sys/fs/cgroup/memory/memory.usage_in_bytes")[0]</td>
-        </tr>
-    }
+        @if (RuntimeInformation.OSDescription.StartsWith("Linux") && Directory.Exists("/sys/fs/cgroup/memory"))
+        {
+            <tr>
+                <td>cgroup memory usage</td>
+                <td>@System.IO.File.ReadAllLines("/sys/fs/cgroup/memory/memory.usage_in_bytes")[0]</td>
+            </tr>
+        }
         <tr>
             <td>Memory, current usage (bytes)</td>
             <td>@process.WorkingSet64</td>
@@ -41,6 +43,24 @@
         <tr>
             <td>Memory, max available (bytes)</td>
             <td>@process.MaxWorkingSet</td>
-        </tr>    
+        </tr>
+
+        <tr>
+            <td>Host name</td>
+            <td>@hostName</td>
+        </tr>
+        <tr>
+            <td style="vertical-align: top">Server IP address</td>
+            <td>
+                @{
+                    foreach (var ip in ipList)
+                    {
+                        @ip
+                        <br />
+                    }
+                }
+
+            </td>
+        </tr>
     </table>
 </div>

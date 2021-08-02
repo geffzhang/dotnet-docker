@@ -1,22 +1,10 @@
 trigger: none
-pr:
-  branches:
-    include:
-    - master
-  paths:
-    exclude:
-    - .github/*
-    - documentation/*
-    - README*
-    - samples/*
+pr: none
 
 variables:
-- template: variables/common.yml
-- name: manifest
-  value: manifest.json
+- template: variables/core.yml
+
 stages:
 - template: ../common/templates/stages/build-test-publish-repo.yml
   parameters:
-    ${{ if eq(variables['System.TeamProject'], 'public') }}:
-      buildMatrixType: platformVersionedOs
-      customBuildLegGrouping: pr-build
+    testMatrixCustomBuildLegGroupArgs: --custom-build-leg-group test-dependencies

@@ -1,8 +1,8 @@
-# Run applications in a .NET Core SDK container
+# Run applications in a .NET SDK container
 
-You can use containers to establish a .NET Core development environment with only Docker and an editor. The environment can be made to match your local machine, production or both.
+You can use containers to establish a .NET development environment with only Docker and an editor. The environment can be made to match your local machine, production or both.
 
-The following examples demonstrate using `dotnet run` in a .NET Core SDK container. It builds an application from source and then launches it. You have to re-launch the container every time you want to observe source code changes.
+The following examples demonstrate using `dotnet run` in a .NET SDK container. It builds an application from source and then launches it. You have to re-launch the container every time you want to observe source code changes.
 
 Alternatively, you can use `dotnet watch run`. This command reruns the application within a running container, with every local code change.
 
@@ -15,21 +15,21 @@ You may need to enable [shared drives (Windows)](https://docs.docker.com/docker-
 Container scenarios that use volume mounting can produce conflicts between the `bin` and `obj` directories in local and container environments.  To avoid that, you need to use a different set of `obj` and `bin` folders for your container environment. The easiest way to do that is to copy a custom [Directory.Build.props](Directory.Build.props) into the directory you are using (like the `dotnetapp` directory in the following example), either via copying from this repo or downloading with the following command:
 
 ```console
-curl -o Directory.Build.props https://raw.githubusercontent.com/dotnet/dotnet-docker/master/samples/Directory.Build.props
+curl -o Directory.Build.props https://raw.githubusercontent.com/dotnet/dotnet-docker/main/samples/Directory.Build.props
 ```
 
 > Note: You may need to remove `bin` and `obj` directories if you run these instructions on Windows in both Windows and Linux container modes.
 
 ## Console app
 
-The following example demonstrates using `dotnet run` with a console app in a .NET Core SDK container. This initial example is demonstrated on macOS. Instructions for all OSes follow.
+The following example demonstrates using `dotnet run` with a console app in a .NET SDK container. This initial example is demonstrated on macOS. Instructions for all OSes follow.
 
 The instructions assume you are in the `samples/dotnetapp` directory (due to the [volume mounting](https://docs.docker.com/engine/admin/volumes/volumes/) `-v` syntax).
 
 ```console
-% docker run --rm -it -v $(pwd):/app/ -w /app mcr.microsoft.com/dotnet/core/sdk:3.1 dotnet run
+% docker run --rm -it -v $(pwd):/app/ -w /app mcr.microsoft.com/dotnet/sdk:5.0 dotnet run
 
-      Hello from .NET Core!
+      Hello from .NET!
       __________________
                         \
                         \
@@ -69,7 +69,7 @@ The instructions assume you are in the `samples/dotnetapp` directory (due to the
           .....
   
 Environment:
-.NET Core 3.1.0
+.NET 5.0.0
 Linux 4.9.184-linuxkit #1 SMP Tue Jul 2 22:58:16 UTC 2019
 ```
 
@@ -80,7 +80,7 @@ The following instructions demonstrate this scenario in various environments.
 ## Linux or macOS
 
 ```console
-docker run --rm -it -v $(pwd):/app/ -w /app mcr.microsoft.com/dotnet/core/sdk:3.1 dotnet run
+docker run --rm -it -v $(pwd):/app/ -w /app mcr.microsoft.com/dotnet/sdk:5.0 dotnet run
 ```
 
 ## Windows using Linux containers
@@ -88,7 +88,7 @@ docker run --rm -it -v $(pwd):/app/ -w /app mcr.microsoft.com/dotnet/core/sdk:3.
 This example uses PowerShell.
 
 ```console
-docker run --rm -it -v ${pwd}:/app/ -w /app mcr.microsoft.com/dotnet/core/sdk:3.1 dotnet run
+docker run --rm -it -v ${pwd}:/app/ -w /app mcr.microsoft.com/dotnet/sdk:5.0 dotnet run
 ```
 
 ## Windows using Windows containers
@@ -96,17 +96,17 @@ docker run --rm -it -v ${pwd}:/app/ -w /app mcr.microsoft.com/dotnet/core/sdk:3.
 This example uses PowerShell.
 
 ```console
-docker run --rm -it -v ${pwd}:c:\app\ -w \app mcr.microsoft.com/dotnet/core/sdk:3.1 dotnet run
+docker run --rm -it -v ${pwd}:c:\app\ -w \app mcr.microsoft.com/dotnet/sdk:5.0 dotnet run
 ```
 
 ## ASP.NET Core App
 
-The following example demonstrates using `dotnet run` with an ASP.NET Core app in a .NET Core SDK container. This initial example is demonstrated on macOS. Instructions for all OSes follow.
+The following example demonstrates using `dotnet run` with an ASP.NET Core app in a .NET SDK container. This initial example is demonstrated on macOS. Instructions for all OSes follow.
 
 The instructions assume you are in the `samples/aspnetapp/aspnetapp` directory (due to the [volume mounting](https://docs.docker.com/engine/admin/volumes/volumes/) `-v` syntax used).
 
 ```console
-% docker run --rm -it -p 8000:80 -v $(pwd):/app/ -w /app -e ASPNETCORE_URLS=http://+:80 -e ASPNETCORE_ENVIRONMENT=Development mcr.microsoft.com/dotnet/core/sdk:3.1 dotnet run --no-launch-profile
+% docker run --rm -it -p 8000:80 -v $(pwd):/app/ -w /app -e ASPNETCORE_URLS=http://+:80 -e ASPNETCORE_ENVIRONMENT=Development mcr.microsoft.com/dotnet/sdk:5.0 dotnet run --no-launch-profile
 
 info: Microsoft.Hosting.Lifetime[0]
       Now listening on: http://[::]:80
@@ -127,7 +127,7 @@ The following instructions demonstrate this scenario in various environments:
 ### Linux or macOS
 
 ```console
-docker run --rm -it -p 8000:80 -v $(pwd):/app/ -w /app -e ASPNETCORE_URLS=http://+:80 -e ASPNETCORE_ENVIRONMENT=Development mcr.microsoft.com/dotnet/core/sdk:3.1 dotnet run --no-launch-profile
+docker run --rm -it -p 8000:80 -v $(pwd):/app/ -w /app -e ASPNETCORE_URLS=http://+:80 -e ASPNETCORE_ENVIRONMENT=Development mcr.microsoft.com/dotnet/sdk:5.0 dotnet run --no-launch-profile
 ```
 
 ### Windows using Linux containers
@@ -135,7 +135,7 @@ docker run --rm -it -p 8000:80 -v $(pwd):/app/ -w /app -e ASPNETCORE_URLS=http:/
 This example uses PowerShell.
 
 ```console
-docker run --rm -it -p 8000:80 -v ${pwd}:/app/ -w /app -e ASPNETCORE_URLS=http://+:80 -e ASPNETCORE_ENVIRONMENT=Development mcr.microsoft.com/dotnet/core/sdk:3.1 dotnet run --no-launch-profile
+docker run --rm -it -p 8000:80 -v ${pwd}:/app/ -w /app -e ASPNETCORE_URLS=http://+:80 -e ASPNETCORE_ENVIRONMENT=Development mcr.microsoft.com/dotnet/sdk:5.0 dotnet run --no-launch-profile
 ```
 
 ### Windows using Windows containers
@@ -143,7 +143,7 @@ docker run --rm -it -p 8000:80 -v ${pwd}:/app/ -w /app -e ASPNETCORE_URLS=http:/
 This example uses PowerShell.
 
 ```console
-docker run --rm -it -p 8000:80 -v ${pwd}:C:\app\ -w /app -e ASPNETCORE_URLS=http://+:80 -e ASPNETCORE_ENVIRONMENT=Development mcr.microsoft.com/dotnet/core/sdk:3.1 dotnet run --no-launch-profile
+docker run --rm -it -p 8000:80 -v ${pwd}:C:\app\ -w \app -e ASPNETCORE_URLS=http://+:80 -e ASPNETCORE_ENVIRONMENT=Development mcr.microsoft.com/dotnet/sdk:5.0 dotnet run --no-launch-profile
 ```
 
 ### Using a launch profile to configure ASP.NET Core
@@ -168,7 +168,7 @@ The following instructions demonstrate this scenario in various environments:
 ### Linux or macOS
 
 ```console
-docker run --rm -it -p 8000:80 -v $(pwd):/app -w /app mcr.microsoft.com/dotnet/core/sdk:3.1 dotnet run --launch-profile publicdev
+docker run --rm -it -p 8000:80 -v $(pwd):/app -w /app mcr.microsoft.com/dotnet/sdk:5.0 dotnet run --launch-profile publicdev
 ```
 
 ### Windows using Linux containers
@@ -176,7 +176,7 @@ docker run --rm -it -p 8000:80 -v $(pwd):/app -w /app mcr.microsoft.com/dotnet/c
 The following example uses PowerShell.
 
 ```console
-docker run --rm -it -p 8000:80 -v ${pwd}:/app -w /app mcr.microsoft.com/dotnet/core/sdk:3.1 dotnet run --launch-profile publicdev
+docker run --rm -it -p 8000:80 -v ${pwd}:/app -w /app mcr.microsoft.com/dotnet/sdk:5.0 dotnet run --launch-profile publicdev
 ```
 
 ### Windows using Windows containers
@@ -184,10 +184,10 @@ docker run --rm -it -p 8000:80 -v ${pwd}:/app -w /app mcr.microsoft.com/dotnet/c
 The following example uses PowerShell.
 
 ```console
-docker run --rm -it -p 8000:80 -v ${pwd}:C:\app -w C:\app mcr.microsoft.com/dotnet/core/sdk:3.1 dotnet run --launch-profile publicdev
+docker run --rm -it -p 8000:80 -v ${pwd}:C:\app -w C:\app mcr.microsoft.com/dotnet/sdk:5.0 dotnet run --launch-profile publicdev
 ```
 
 ## More Samples
 
-* [.NET Core Docker Samples](../README.md)
+* [.NET Docker Samples](../README.md)
 * [.NET Framework Docker Samples](https://github.com/microsoft/dotnet-framework-docker-samples/)

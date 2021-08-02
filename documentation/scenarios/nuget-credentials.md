@@ -35,7 +35,7 @@ Here's an example `nuget.config` file containing the credentials:
 In the Dockerfile, the `nuget.config` file is copied via the build context and stored in the file system only for the `build` stage. In the `runtime` stage, only the binaries of the application are copied, not the `nuget.config` file so the credentials are not exposed in the final image.
 
 ```Dockerfile
-FROM mcr.microsoft.com/dotnet/core/sdk:3.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:5.0 AS build
 
 WORKDIR /app
 
@@ -49,7 +49,7 @@ COPY . .
 RUN dotnet publish -c Release -o out  --no-restore
 
 
-FROM mcr.microsoft.com/dotnet/core/runtime:3.0 AS runtime
+FROM mcr.microsoft.com/dotnet/runtime:5.0 AS runtime
 WORKDIR /app/
 COPY --from=build /app/out ./
 ENTRYPOINT ["dotnet", "dotnetapp.dll"]
@@ -91,7 +91,7 @@ When making use of the `ARG` instruction, the name of the argument is made avail
 In the Dockerfile below, there are two stages: build and runtime. The build stage is responsible for building the application project. It defines two `ARG` values which match the names of the environment variables used in the the `nuget.config` file. But the build stage is not the final stage of the Dockerfile so the `--build-arg` values that are passed to the `docker build` command do not get exposed in the resulting image. All the final stage is really doing is copying the built output of the application from the build stage since that's all that's needed to run the application.
 
 ```Dockerfile
-FROM mcr.microsoft.com/dotnet/core/sdk:3.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:5.0 AS build
 
 ARG Nuget_CustomFeedUserName
 ARG Nuget_CustomFeedPassword
@@ -108,7 +108,7 @@ COPY . .
 RUN dotnet publish -c Release -o out  --no-restore
 
 
-FROM mcr.microsoft.com/dotnet/core/runtime:3.0 AS runtime
+FROM mcr.microsoft.com/dotnet/runtime:5.0 AS runtime
 WORKDIR /app/
 COPY --from=build /app/out ./
 ENTRYPOINT ["dotnet", "dotnetapp.dll"]
@@ -124,7 +124,7 @@ Passing the username and password values to the `docker build` command in this m
 
 ## Using the Azure Artifact Credential Provider
 
-NuGet has support for [custom credential providers](https://docs.microsoft.com/en-us/nuget/reference/extensibility/nuget-exe-credential-providers) that provide a mechanism to authenticate to feeds both interactively and non-interactively. One such implementation of this is [Azure Artifact Credential Provider](https://github.com/Microsoft/artifacts-credprovider) which provides a mechanism to acquire credentials for restoring NuGet packages from Azure Artifacts feeds. In unattended build agent scenarios, like building Docker images, a `VSS_NUGET_EXTERNAL_FEED_ENDPOINTS` [environment variable](https://github.com/Microsoft/artifacts-credprovider#environment-variables) is used to supply an access token.
+NuGet has support for [custom credential providers](https://docs.microsoft.com/en-us/nuget/reference/extensibility/nuget-cross-platform-authentication-plugin) that provide a mechanism to authenticate to feeds both interactively and non-interactively. One such implementation of this is [Azure Artifact Credential Provider](https://github.com/Microsoft/artifacts-credprovider) which provides a mechanism to acquire credentials for restoring NuGet packages from Azure Artifacts feeds. In unattended build agent scenarios, like building Docker images, a `VSS_NUGET_EXTERNAL_FEED_ENDPOINTS` [environment variable](https://github.com/Microsoft/artifacts-credprovider#environment-variables) is used to supply an access token.
 
 If you're using Azure Artifacts for your private NuGet feeds, this scenario is for you since it provides a compatible experience between interactive developer machines and automated scenarios like Docker image builds. This allows you to use the same `nuget.config` file in either scenario. In this pattern, we'll use the environment variables and multi-stage build along with Credential Provider to pass the credentials for a private NuGet feed.
 
@@ -144,19 +144,19 @@ The `VSS_NUGET_EXTERNAL_FEED_ENDPOINTS` environment variable is a well-known var
 
 Instead, the credentials for `customfeed` are defined in the Dockerfile by making use of an `ARG` for the access token:
 
+*Linux*
+
 ```Dockerfile
-FROM mcr.microsoft.com/dotnet/core/sdk:3.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:5.0 AS build
 WORKDIR /app
 
-ARG FEED_ACCESSTOKEN
-ENV VSS_NUGET_EXTERNAL_FEED_ENDPOINTS \
-    "{\"endpointCredentials\": [{\"endpoint\":\"https://fabrikam.pkgs.visualstudio.com/_packaging/MyGreatFeed/nuget/v3/index.json\", \"username\":\"docker\", \"password\":\"${FEED_ACCESSTOKEN}\"}]}"
-
-RUN curl -L https://raw.githubusercontent.com/Microsoft/artifacts-credprovider/master/helpers/installcredprovider.sh  | bash
+RUN curl -L https://raw.githubusercontent.com/Microsoft/artifacts-credprovider/master/helpers/installcredprovider.sh  | sh
 
 # Copy csproj and restore as distinct layers
 COPY *.csproj .
 COPY ./nuget.config .
+ARG FEED_ACCESSTOKEN
+ENV VSS_NUGET_EXTERNAL_FEED_ENDPOINTS="{\"endpointCredentials\": [{\"endpoint\":\"https://fabrikam.pkgs.visualstudio.com/_packaging/MyGreatFeed/nuget/v3/index.json\", \"username\":\"docker\", \"password\":\"${FEED_ACCESSTOKEN}\"}]}"
 RUN dotnet restore
 
 # Copy and publish app and libraries
@@ -164,7 +164,44 @@ COPY . .
 RUN dotnet publish -c Release -o out --no-restore
 
 
-FROM mcr.microsoft.com/dotnet/core/runtime:3.0 AS runtime
+FROM mcr.microsoft.com/dotnet/runtime:5.0 AS runtime
+WORKDIR /app/
+COPY --from=build /app/out ./
+ENTRYPOINT ["dotnet", "dotnetapp.dll"]
+```
+
+*Windows*
+
+```Dockerfile
+# escape=`
+
+FROM mcr.microsoft.com/dotnet/sdk:5.0 AS build
+
+SHELL ["pwsh", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
+
+# Change user to workaround https://github.com/microsoft/artifacts-credprovider/issues/201
+USER ContainerAdministrator
+# Install the cred provider
+RUN Invoke-WebRequest https://raw.githubusercontent.com/microsoft/artifacts-credprovider/master/helpers/installcredprovider.ps1 -OutFile installcredprovider.ps1; `
+    .\installcredprovider.ps1; `
+    del installcredprovider.ps1
+USER ContainerUser
+
+WORKDIR /app
+
+# Copy csproj and restore as distinct layers
+COPY *.csproj .
+COPY nuget.config .
+ARG FEED_ACCESSTOKEN
+ENV VSS_NUGET_EXTERNAL_FEED_ENDPOINTS="{`"endpointCredentials`": [{`"endpoint`":`"https://fabrikam.pkgs.visualstudio.com/_packaging/MyGreatFeed/nuget/v3/index.json`", `"username`":`"docker`", `"password`":`"${FEED_ACCESSTOKEN}`"}]}"
+RUN dotnet restore
+
+# Copy and publish app and libraries
+COPY . .
+RUN dotnet publish -c Release -o out --no-restore
+
+
+FROM mcr.microsoft.com/dotnet/runtime:5.0 AS runtime
 WORKDIR /app/
 COPY --from=build /app/out ./
 ENTRYPOINT ["dotnet", "dotnetapp.dll"]
@@ -172,13 +209,38 @@ ENTRYPOINT ["dotnet", "dotnetapp.dll"]
 
 _Note that a script is called to install the Credential Provider. When `dotnet restore` is run, the Credential Provider is invoked to resolve the credentials and it retrieves them from the `VSS_NUGET_EXTERNAL_FEED_ENDPOINTS` environment variable._
 
-Before running `docker build`, first populate the `FEED_ACCESSTOKEN` environment variable with an access token. Then, this Dockerfile would be built using this command:
+Before running `docker build`, first populate the `FEED_ACCESSTOKEN` environment variable with a [personal access token](https://docs.microsoft.com/azure/devops/organizations/accounts/use-personal-access-tokens-to-authenticate). Then, this Dockerfile would be built using this command:
 
 ```bash
 docker build --build-arg FEED_ACCESSTOKEN .
 ```
 
 Passing the access token to the `docker build` command in this manner can be useful in automated scenarios when that value is stored as an environment variable on the Docker host machine or can be retrieved from an external secrets storage location and passed to the `docker build` command.
+
+### Credential Provider Troubleshooting
+
+If you are having authentication issues, try adding a command to the Dockerfile to print out the value of the `VSS_NUGET_EXTERNAL_FEED_ENDPOINTS` environment variable. This will help you to ensure it is set and formatted correctly.
+
+Example (Linux):
+
+```Dockerfile
+ENV VSS_NUGET_EXTERNAL_FEED_ENDPOINTS="{`"endpointCredentials`": [{`"endpoint`":`"https://fabrikam.pkgs.visualstudio.com/_packaging/MyGreatFeed/nuget/v3/index.json`", `"username`":`"docker`", `"password`":`"${FEED_ACCESSTOKEN}`"}]}"
+RUN echo $VSS_NUGET_EXTERNAL_FEED_ENDPOINTS
+```
+
+Example (Windows PowerShell):
+
+```Dockerfile
+ENV VSS_NUGET_EXTERNAL_FEED_ENDPOINTS="{`"endpointCredentials`": [{`"endpoint`":`"https://fabrikam.pkgs.visualstudio.com/_packaging/MyGreatFeed/nuget/v3/index.json`", `"username`":`"docker`", `"password`":`"${FEED_ACCESSTOKEN}`"}]}"
+RUN echo $Env:VSS_NUGET_EXTERNAL_FEED_ENDPOINTS
+```
+
+Example (Windows Cmd):
+
+```Dockerfile
+ENV VSS_NUGET_EXTERNAL_FEED_ENDPOINTS="{`"endpointCredentials`": [{`"endpoint`":`"https://fabrikam.pkgs.visualstudio.com/_packaging/MyGreatFeed/nuget/v3/index.json`", `"username`":`"docker`", `"password`":`"${FEED_ACCESSTOKEN}`"}]}"
+RUN echo %VSS_NUGET_EXTERNAL_FEED_ENDPOINTS%
+```
 
 ## Passing secrets by file with BuildKit
 
@@ -208,7 +270,7 @@ The Dockerfile references the `nugetconfig` secret with the `--mount=type=secret
 ```Dockerfile
 # syntax = docker/dockerfile:1.0-experimental
 
-FROM mcr.microsoft.com/dotnet/core/sdk:3.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:5.0 AS build
 WORKDIR /app
 
 # Copy csproj and restore as distinct layers
@@ -221,7 +283,7 @@ COPY . .
 RUN dotnet publish -c Release -o out --no-restore
 
 
-FROM mcr.microsoft.com/dotnet/core/runtime:3.0 AS runtime
+FROM mcr.microsoft.com/dotnet/runtime:5.0 AS runtime
 WORKDIR /app/
 COPY --from=build /app/out ./
 ENTRYPOINT ["dotnet", "dotnetapp.dll"]
@@ -236,3 +298,9 @@ DOCKER_BUILDKIT=1 docker build --secret id=nugetconfig,src=nuget.config .
 ## Other Options
 
 There are a number of techniques that can be used to protect secrets in a Docker build. Doing a web search yields a good quantity of material out there. The options listed above are considered to be simple and straightforward but depending on your environment and tolerance for complexity, you may want to consider other options. You're encouraged to do your research and find an option that works best for you.
+
+## General Troubleshooting
+
+* The sample Dockerfiles provided above make the assumption that the application's projects are all based on .NET. If you're attempting to build a project that is based on a .NET Framework project that makes use of a packages.config file, you'll need to run `nuget restore` instead of `dotnet restore` for that project or solution.
+
+* Often times, restoration of NuGet packages is the first point in a Dockerfile that attempts to make a network call. Firewalls and proxies can impact network connectivity. If you're encountering connection issues when attempting to restore NuGet packages, make sure that the container actually has network access by adding a command like `RUN ping www.microsoft.com`.

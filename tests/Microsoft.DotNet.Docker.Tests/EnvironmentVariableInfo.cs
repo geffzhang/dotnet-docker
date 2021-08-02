@@ -17,44 +17,48 @@ namespace Microsoft.DotNet.Docker.Tests
 
         public EnvironmentVariableInfo(string name, string expectedValue)
         {
-            this.Name = name;
-            this.ExpectedValue = expectedValue;
+            Name = name;
+            ExpectedValue = expectedValue;
         }
 
         public EnvironmentVariableInfo(string name, bool allowAnyValue)
         {
-            this.Name = name;
-            this.AllowAnyValue = allowAnyValue;
+            Name = name;
+            AllowAnyValue = allowAnyValue;
         }
 
         public static void Validate(
             IEnumerable<EnvironmentVariableInfo> variables,
-            DotNetImageType imageType,
-            ProductImageData imageData,
+            string imageName,
+            ImageData imageData,
             DockerHelper dockerHelper)
         {
             const char delimiter = '|';
             IEnumerable<string> echoParts;
             string invokeCommand;
             char delimiterEscape;
+            string entrypoint;
 
             if (DockerHelper.IsLinuxContainerModeEnabled)
             {
                 echoParts = variables.Select(envVar => $"${envVar.Name}");
-                invokeCommand = $"/bin/sh -c";
+                entrypoint = "/bin/sh";
+                invokeCommand = "-c";
                 delimiterEscape = '\\';
             }
             else
             {
                 echoParts = variables.Select(envVar => $"%{envVar.Name}%");
-                invokeCommand = $"CMD /S /C";
+                entrypoint = "CMD";
+                invokeCommand = "/S /C";
                 delimiterEscape = '^';
             }
 
             string combinedValues = dockerHelper.Run(
-                image: imageData.GetImage(imageType, dockerHelper),
+                image: imageName,
                 name: imageData.GetIdentifier($"env"),
-                command: $"{invokeCommand} \"echo {String.Join($"{delimiterEscape}{delimiter}", echoParts)}\"");
+                optionalRunArgs: $"--entrypoint {entrypoint}",
+                command: $"{invokeCommand} \"echo {string.Join($"{delimiterEscape}{delimiter}", echoParts)}\"");
 
             string[] values = combinedValues.Split(delimiter);
             Assert.Equal(variables.Count(), values.Count());

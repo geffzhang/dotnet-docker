@@ -20,9 +20,13 @@ param(
     [string]$Mode = "BuildAndTest",
 
     # Categories of tests to run
-    [ValidateSet("runtime", "runtime-deps", "aspnet", "sdk", "sample", "image-size")]
-    [string[]]$TestCategories = @("runtime", "runtime-deps", "aspnet", "sdk", "sample", "image-size")
+    [ValidateSet("runtime", "runtime-deps", "aspnet", "sdk", "pre-build", "sample", "image-size", "monitor")]
+    [string[]]$TestCategories = @("runtime", "runtime-deps", "aspnet", "sdk", "pre-build", "sample", "image-size", "monitor")
 )
+
+if (($Mode -eq "BuildAndTest" -or $Mode -eq "Test") -and $TestCategories.Contains("pre-build")) {
+    & ./tests/run-tests.ps1 -TestCategories "pre-build"
+}
 
 if ($Mode -eq "BuildAndTest" -or $Mode -eq "Build") {
     # Build the product images

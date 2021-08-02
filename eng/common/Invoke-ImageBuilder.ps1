@@ -48,6 +48,8 @@ function Exec {
     Log "Executing: '$Cmd'"
     Invoke-Expression $Cmd
     if ($LASTEXITCODE -ne 0) {
+        $host.SetShouldExit($LASTEXITCODE)
+        exit $LASTEXITCODE
         throw "Failed: '$Cmd'"
     }
 }
@@ -57,22 +59,14 @@ $containerCreated = $false
 
 pushd $PSScriptRoot/../../
 try {
-    # Load common image names
-    Get-Content ./eng/common/templates/variables/docker-images.yml |
-    Where-Object { $_.Trim() -notlike 'variables:' } |
-    ForEach-Object { 
-        $parts = $_.Split(':', 2)
-        Set-Variable -Name $parts[0].Trim() -Value $parts[1].Trim()
-    }
-
     $activeOS = docker version -f "{{ .Server.Os }}"
     if ($activeOS -eq "linux") {
         # On Linux, ImageBuilder is run within a container.
         $imageBuilderImageName = "microsoft-dotnet-imagebuilder-withrepo"
         if ($ReuseImageBuilderImage -ne $True) {
-            ./eng/common/Invoke-WithRetry.ps1 "docker pull ${imageNames.imagebuilder.linux}"
+            & ./eng/common/Get-ImageBuilder.ps1
             Exec ("docker build -t $imageBuilderImageName --build-arg " `
-                + "IMAGE=${imageNames.imagebuilder.linux} -f eng/common/Dockerfile.WithRepo .")
+                + "IMAGE=${imageNames.imagebuilder} -f eng/common/Dockerfile.WithRepo .")
         }
 
         $imageBuilderCmd = "docker run --name $imageBuilderContainerName -v /var/run/docker.sock:/var/run/docker.sock $imageBuilderImageName"
@@ -83,8 +77,8 @@ try {
         $imageBuilderFolder = ".Microsoft.DotNet.ImageBuilder"
         $imageBuilderCmd = [System.IO.Path]::Combine($imageBuilderFolder, "Microsoft.DotNet.ImageBuilder.exe")
         if (-not (Test-Path -Path "$imageBuilderCmd" -PathType Leaf)) {
-            ./eng/common/Invoke-WithRetry.ps1 "docker pull ${imageNames.imagebuilder.windows}"
-            Exec "docker create --name $imageBuilderContainerName ${imageNames.imagebuilder.windows}"
+            & ./eng/common/Get-ImageBuilder.ps1
+            Exec "docker create --name $imageBuilderContainerName ${imageNames.imagebuilder}"
             $containerCreated = $true
             if (Test-Path -Path $imageBuilderFolder)
             {

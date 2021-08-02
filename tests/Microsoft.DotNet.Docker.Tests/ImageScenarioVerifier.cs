@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
+using System.Text;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -78,29 +79,64 @@ namespace Microsoft.DotNet.Docker.Tests
             string programFilePath = Path.Combine(appDir, "Program.cs");
 
             SyntaxTree programTree = CSharpSyntaxTree.ParseText(File.ReadAllText(programFilePath));
+
+            string newContent;
+
             MethodDeclarationSyntax mainMethod = programTree.GetRoot().DescendantNodes()
                 .OfType<MethodDeclarationSyntax>()
                 .FirstOrDefault(method => method.Identifier.ValueText == "Main");
 
-            StatementSyntax testHttpsConnectivityStatement = SyntaxFactory.ParseStatement(
-                "var task = new System.Net.Http.HttpClient().GetAsync(\"https://www.microsoft.com\");" +
-                "task.Wait();" +
-                "task.Result.EnsureSuccessStatusCode();");
+            if (mainMethod is null)
+            {
+                // Handles project templates that use top-level statements instead of a Main method
+                IEnumerable<SyntaxNode> nodes = programTree.GetRoot().ChildNodes();
 
-            MethodDeclarationSyntax newMainMethod = mainMethod.InsertNodesBefore(
-                mainMethod.Body.ChildNodes().First(),
-                new SyntaxNode[] { testHttpsConnectivityStatement });
+                IEnumerable<UsingDirectiveSyntax> usingDirectives = nodes.OfType<UsingDirectiveSyntax>();
 
-            SyntaxNode newRoot = programTree.GetRoot().ReplaceNode(mainMethod, newMainMethod);
-            File.WriteAllText(programFilePath, newRoot.ToFullString());
+                IEnumerable<SyntaxNode> otherNodes = nodes.Except(usingDirectives);
+
+                StringBuilder builder = new();
+                foreach (UsingDirectiveSyntax usingDir in usingDirectives)
+                {
+                    builder.Append(usingDir.ToFullString());
+                }
+
+                builder.AppendLine("var response = await new System.Net.Http.HttpClient().GetAsync(\"https://www.microsoft.com\");");
+                builder.AppendLine("response.EnsureSuccessStatusCode();");
+
+                foreach (SyntaxNode otherNode in otherNodes)
+                {
+                    builder.Append(otherNode.ToFullString());
+                }
+
+                newContent = builder.ToString();
+            }
+            else
+            {
+                StatementSyntax testHttpsConnectivityStatement = SyntaxFactory.ParseStatement(
+                    "var task = new System.Net.Http.HttpClient().GetAsync(\"https://www.microsoft.com\");" +
+                    "task.Wait();" +
+                    "task.Result.EnsureSuccessStatusCode();");
+
+                MethodDeclarationSyntax newMainMethod = mainMethod.InsertNodesBefore(
+                    mainMethod.Body.ChildNodes().First(),
+                    new SyntaxNode[] { testHttpsConnectivityStatement });
+
+                SyntaxNode newRoot = programTree.GetRoot().ReplaceNode(mainMethod, newMainMethod);
+                newContent = newRoot.ToFullString();
+            }
+            
+            File.WriteAllText(programFilePath, newContent);
         }
 
         private string BuildTestAppImage(string stageTarget, string contextDir, params string[] customBuildArgs)
         {
             string tag = _imageData.GetIdentifier(stageTarget);
 
-            List<string> buildArgs = new List<string>();
-            buildArgs.Add($"sdk_image={_imageData.GetImage(DotNetImageType.SDK, _dockerHelper)}");
+            List<string> buildArgs = new List<string>
+            {
+                $"sdk_image={_imageData.GetImage(DotNetImageType.SDK, _dockerHelper)}"
+            };
 
             DotNetImageType runtimeImageType = _isWeb ? DotNetImageType.Aspnet : DotNetImageType.Runtime;
             buildArgs.Add($"runtime_image={_imageData.GetImage(runtimeImageType, _dockerHelper)}");
@@ -132,9 +168,7 @@ namespace Microsoft.DotNet.Docker.Tests
             try
             {
                 string targetFramework;
-                // TODO: Until https://github.com/dotnet/aspnetcore/pull/19860 is fixed, 5.0 web projects need to
-                // continue to use the old TFM.
-                if (_imageData.Version.Major < 5 || appType == "web")
+                if (_imageData.Version.Major < 5)
                 {
                     targetFramework = $"netcoreapp{_imageData.Version}";
                 }
@@ -209,14 +243,14 @@ namespace Microsoft.DotNet.Docker.Tests
             }
         }
 
-        public static async Task VerifyHttpResponseFromContainerAsync(string containerName, DockerHelper dockerHelper, ITestOutputHelper outputHelper)
+        public static async Task<HttpResponseMessage> GetHttpResponseFromContainerAsync(string containerName, DockerHelper dockerHelper, ITestOutputHelper outputHelper, int containerPort = 80, string pathAndQuery = null, Action<HttpResponseMessage> validateCallback = null)
         {
-            var retries = 30;
+            int retries = 30;
 
             // Can't use localhost when running inside containers or Windows.
-            var url = !Config.IsRunningInContainer && DockerHelper.IsLinuxContainerModeEnabled
-                ? $"http://localhost:{dockerHelper.GetContainerHostPort(containerName)}"
-                : $"http://{dockerHelper.GetContainerAddress(containerName)}";
+            string url = !Config.IsRunningInContainer && DockerHelper.IsLinuxContainerModeEnabled
+                ? $"http://localhost:{dockerHelper.GetContainerHostPort(containerName, containerPort)}/{pathAndQuery}"
+                : $"http://{dockerHelper.GetContainerAddress(containerName)}:{containerPort}/{pathAndQuery}";
 
             using (HttpClient client = new HttpClient())
             {
@@ -225,24 +259,48 @@ namespace Microsoft.DotNet.Docker.Tests
                     retries--;
                     await Task.Delay(TimeSpan.FromSeconds(2));
 
+                    HttpResponseMessage result = null;
                     try
                     {
-                        using (HttpResponseMessage result = await client.GetAsync(url))
+                        result = await client.GetAsync(url);
+                        outputHelper.WriteLine($"HTTP {result.StatusCode}\n{(await result.Content.ReadAsStringAsync())}");
+
+                        if (null == validateCallback)
                         {
-                            outputHelper.WriteLine($"HTTP {result.StatusCode}\n{(await result.Content.ReadAsStringAsync())}");
                             result.EnsureSuccessStatusCode();
                         }
+                        else
+                        {
+                            validateCallback(result);
+                        }
 
-                        return;
+                        // Store response in local that will not be disposed
+                        HttpResponseMessage returnResult = result;
+                        result = null;
+                        return returnResult;
                     }
                     catch (Exception ex)
                     {
-                        outputHelper.WriteLine($"Request to {url} failed - retrying: {ex.ToString()}");
+                        outputHelper.WriteLine($"Request to {url} failed - retrying: {ex}");
+                    }
+                    finally
+                    {
+                        result?.Dispose();
                     }
                 }
             }
 
             throw new TimeoutException($"Timed out attempting to access the endpoint {url} on container {containerName}");
+        }
+
+        public static async Task VerifyHttpResponseFromContainerAsync(string containerName, DockerHelper dockerHelper, ITestOutputHelper outputHelper, int containerPort = 80, string pathAndQuery = null)
+        {
+            (await GetHttpResponseFromContainerAsync(
+                containerName,
+                dockerHelper,
+                outputHelper,
+                containerPort,
+                pathAndQuery)).Dispose();
         }
     }
 }

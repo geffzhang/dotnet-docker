@@ -17,38 +17,58 @@ namespace Microsoft.DotNet.Docker.Tests
             new ProductImageData { Version = V2_1, OS = OS.StretchSlim,  Arch = Arch.Amd64 },
             new ProductImageData { Version = V2_1, OS = OS.Bionic,       Arch = Arch.Amd64 },
             new ProductImageData { Version = V2_1, OS = OS.Focal,        Arch = Arch.Amd64 },
-            new ProductImageData { Version = V2_1, OS = OS.Alpine311,    Arch = Arch.Amd64 },
+            new ProductImageData { Version = V2_1, OS = OS.Alpine313,    Arch = Arch.Amd64 },
             new ProductImageData { Version = V2_1, OS = OS.StretchSlim,  Arch = Arch.Arm },
             new ProductImageData { Version = V2_1, OS = OS.Bionic,       Arch = Arch.Arm },
+            new ProductImageData { Version = V2_1, OS = OS.Focal,        Arch = Arch.Arm },
             new ProductImageData { Version = V3_1, OS = OS.BusterSlim,   Arch = Arch.Amd64 },
             new ProductImageData { Version = V3_1, OS = OS.Bionic,       Arch = Arch.Amd64 },
             new ProductImageData { Version = V3_1, OS = OS.Focal,        Arch = Arch.Amd64 },
-            new ProductImageData { Version = V3_1, OS = OS.Alpine311,    Arch = Arch.Amd64 },
+            new ProductImageData { Version = V3_1, OS = OS.Alpine313,    Arch = Arch.Amd64 },
             new ProductImageData { Version = V3_1, OS = OS.BusterSlim,   Arch = Arch.Arm },
             new ProductImageData { Version = V3_1, OS = OS.Bionic,       Arch = Arch.Arm },
+            new ProductImageData { Version = V3_1, OS = OS.Focal,        Arch = Arch.Arm },
             new ProductImageData { Version = V3_1, OS = OS.BusterSlim,   Arch = Arch.Arm64 },
             new ProductImageData { Version = V3_1, OS = OS.Bionic,       Arch = Arch.Arm64 },
             new ProductImageData { Version = V3_1, OS = OS.Focal,        Arch = Arch.Arm64 },
-            new ProductImageData { Version = V3_1, OS = OS.Alpine311,    Arch = Arch.Arm64,   SdkOS = OS.Buster },
+            new ProductImageData { Version = V3_1, OS = OS.Alpine313,    Arch = Arch.Arm64,   SdkOS = OS.Buster },
+            new ProductImageData { Version = V3_1, OS = OS.Mariner10,    Arch = Arch.Amd64 },
             new ProductImageData { Version = V5_0, OS = OS.BusterSlim,   Arch = Arch.Amd64 },
             new ProductImageData { Version = V5_0, OS = OS.Focal,        Arch = Arch.Amd64 },
-            new ProductImageData { Version = V5_0, OS = OS.Alpine311,    Arch = Arch.Amd64 },
+            new ProductImageData { Version = V5_0, OS = OS.Alpine313,    Arch = Arch.Amd64 },
+            new ProductImageData { Version = V5_0, OS = OS.Mariner10,    Arch = Arch.Amd64 },
             new ProductImageData { Version = V5_0, OS = OS.BusterSlim,   Arch = Arch.Arm },
             new ProductImageData { Version = V5_0, OS = OS.BusterSlim,   Arch = Arch.Arm64 },
+            new ProductImageData { Version = V5_0, OS = OS.Focal,        Arch = Arch.Arm },
             new ProductImageData { Version = V5_0, OS = OS.Focal,        Arch = Arch.Arm64 },
-            new ProductImageData { Version = V5_0, OS = OS.Alpine311,    Arch = Arch.Arm64,   SdkOS = OS.BusterSlim },
+            new ProductImageData { Version = V5_0, OS = OS.Alpine313,    Arch = Arch.Arm64,   SdkOS = OS.BusterSlim },
+            new ProductImageData { Version = V6_0, OS = OS.BullseyeSlim, Arch = Arch.Amd64 },
+            new ProductImageData { Version = V6_0, OS = OS.Focal,        Arch = Arch.Amd64 },
+            new ProductImageData { Version = V6_0, OS = OS.Alpine313,    Arch = Arch.Amd64 },
+            new ProductImageData { Version = V6_0, OS = OS.Mariner10,    Arch = Arch.Amd64 },
+            new ProductImageData { Version = V6_0, OS = OS.BullseyeSlim, Arch = Arch.Arm },
+            new ProductImageData { Version = V6_0, OS = OS.BullseyeSlim, Arch = Arch.Arm64 },
+            new ProductImageData { Version = V6_0, OS = OS.Focal,        Arch = Arch.Arm },
+            new ProductImageData { Version = V6_0, OS = OS.Focal,        Arch = Arch.Arm64 },
+            new ProductImageData { Version = V6_0, OS = OS.Alpine313,    Arch = Arch.Arm },
+            new ProductImageData { Version = V6_0, OS = OS.Alpine313,    Arch = Arch.Arm64 },
         };
         private static readonly ProductImageData[] s_windowsTestData =
         {
-            new ProductImageData { Version = V2_1, OS = OS.NanoServer1809, Arch = Arch.Amd64 },
-            new ProductImageData { Version = V2_1, OS = OS.NanoServer1903, Arch = Arch.Amd64 },
-            new ProductImageData { Version = V2_1, OS = OS.NanoServer1909, Arch = Arch.Amd64 },
-            new ProductImageData { Version = V3_1, OS = OS.NanoServer1809, Arch = Arch.Amd64 },
-            new ProductImageData { Version = V3_1, OS = OS.NanoServer1903, Arch = Arch.Amd64 },
-            new ProductImageData { Version = V3_1, OS = OS.NanoServer1909, Arch = Arch.Amd64 },
-            new ProductImageData { Version = V5_0, OS = OS.NanoServer1809, Arch = Arch.Amd64 },
-            new ProductImageData { Version = V5_0, OS = OS.NanoServer1903, Arch = Arch.Amd64 },
-            new ProductImageData { Version = V5_0, OS = OS.NanoServer1909, Arch = Arch.Amd64 },
+            new ProductImageData { Version = V2_1, OS = OS.NanoServer1809,     Arch = Arch.Amd64 },
+            new ProductImageData { Version = V2_1, OS = OS.NanoServer2004,     Arch = Arch.Amd64 },
+            new ProductImageData { Version = V2_1, OS = OS.NanoServer20H2,     Arch = Arch.Amd64 },
+            new ProductImageData { Version = V3_1, OS = OS.NanoServer1809,     Arch = Arch.Amd64 },
+            new ProductImageData { Version = V3_1, OS = OS.NanoServer2004,     Arch = Arch.Amd64 },
+            new ProductImageData { Version = V3_1, OS = OS.NanoServer20H2,     Arch = Arch.Amd64 },
+            new ProductImageData { Version = V5_0, OS = OS.NanoServer1809,     Arch = Arch.Amd64 },
+            new ProductImageData { Version = V5_0, OS = OS.NanoServer2004,     Arch = Arch.Amd64 },
+            new ProductImageData { Version = V5_0, OS = OS.NanoServer20H2,     Arch = Arch.Amd64 },
+            new ProductImageData { Version = V5_0, OS = OS.ServerCoreLtsc2019, Arch = Arch.Amd64 },
+            new ProductImageData { Version = V6_0, OS = OS.NanoServer1809,     Arch = Arch.Amd64 },
+            new ProductImageData { Version = V6_0, OS = OS.NanoServer2004,     Arch = Arch.Amd64 },
+            new ProductImageData { Version = V6_0, OS = OS.NanoServer20H2,     Arch = Arch.Amd64 },
+            new ProductImageData { Version = V6_0, OS = OS.ServerCoreLtsc2019, Arch = Arch.Amd64 },
         };
         
         private static readonly SampleImageData[] s_linuxSampleTestData =
@@ -73,11 +93,30 @@ namespace Microsoft.DotNet.Docker.Tests
         private static readonly SampleImageData[] s_windowsSampleTestData =
         {
             new SampleImageData { OS = OS.NanoServer1809, Arch = Arch.Amd64, IsPublished = true },
-            new SampleImageData { OS = OS.NanoServer1903, Arch = Arch.Amd64, IsPublished = true },
-            new SampleImageData { OS = OS.NanoServer1909, Arch = Arch.Amd64, IsPublished = true },
+            new SampleImageData { OS = OS.NanoServer2004, Arch = Arch.Amd64, IsPublished = true },
+            new SampleImageData { OS = OS.NanoServer20H2, Arch = Arch.Amd64, IsPublished = true },
 
-            new SampleImageData { OS = OS.NanoServer1909, Arch = Arch.Amd64, DockerfileSuffix = "nanoserver-x64" },
-            new SampleImageData { OS = OS.NanoServer1909, Arch = Arch.Amd64, DockerfileSuffix = "nanoserver-x64-slim" },
+            new SampleImageData { OS = OS.NanoServer20H2, Arch = Arch.Amd64, DockerfileSuffix = "nanoserver-x64" },
+            new SampleImageData { OS = OS.NanoServer20H2, Arch = Arch.Amd64, DockerfileSuffix = "nanoserver-x64-slim" },
+
+            // Use Nano Server as the OS even though the Dockerfiles are for Windows Server Core. This is because the OS value
+            // needs to match the filter set by the build/test job. We only produce builds jobs based on what's in the manifest
+            // and the manifest only defines Nano Server-based Dockerfiles. So we just need to piggyback on the Nano Server
+            // jobs in order to test the Windows Server Core samples.
+            new SampleImageData { OS = OS.NanoServer1809, Arch = Arch.Amd64, DockerfileSuffix = "windowsservercore-x64" },
+            new SampleImageData { OS = OS.NanoServer1809, Arch = Arch.Amd64, DockerfileSuffix = "windowsservercore-iis-x64" },
+
+            // Disabling the slim sample due to https://github.com/dotnet/dotnet-docker/issues/2938
+            //new SampleImageData { OS = OS.NanoServer1809, Arch = Arch.Amd64, DockerfileSuffix = "windowsservercore-x64-slim" },
+        };
+
+        private static readonly MonitorImageData[] s_linuxMonitorTestData =
+        {
+            new MonitorImageData { Version = V5_0, RuntimeVersion = V3_1, OS = OS.Alpine313, OSTag = OS.Alpine, Arch = Arch.Amd64 },
+        };
+
+        private static readonly MonitorImageData[] s_windowsMonitorTestData =
+        {
         };
 
         public static IEnumerable<ProductImageData> GetImageData()
@@ -88,16 +127,28 @@ namespace Microsoft.DotNet.Docker.Tests
                 .FilterImagesByOs()
                 .Cast<ProductImageData>();
         }
-        
+
+        public static IEnumerable<SampleImageData> GetAllSampleImageData() =>
+            DockerHelper.IsLinuxContainerModeEnabled ? s_linuxSampleTestData : s_windowsSampleTestData;
+
         public static IEnumerable<SampleImageData> GetSampleImageData()
         {
-            return (DockerHelper.IsLinuxContainerModeEnabled ? s_linuxSampleTestData : s_windowsSampleTestData)
+            return GetAllSampleImageData()
                 .FilterImagesByArch()
                 .FilterImagesByOs()
                 .Cast<SampleImageData>();
         }
 
-        private static IEnumerable<ImageData> FilterImagesByVersion(this IEnumerable<ProductImageData> imageData)
+        public static IEnumerable<MonitorImageData> GetMonitorImageData()
+        {
+            return (DockerHelper.IsLinuxContainerModeEnabled ? s_linuxMonitorTestData : s_windowsMonitorTestData)
+                .FilterMonitorImagesByRuntimeVersion()
+                .FilterImagesByArch()
+                .FilterImagesByOs()
+                .Cast<MonitorImageData>();
+        }
+
+        public static IEnumerable<ImageData> FilterImagesByVersion(this IEnumerable<ProductImageData> imageData)
         {
             string versionFilterPattern = GetFilterRegexPattern("IMAGE_VERSION");
             return imageData
@@ -105,7 +156,15 @@ namespace Microsoft.DotNet.Docker.Tests
                     || Regex.IsMatch(imageData.VersionString, versionFilterPattern, RegexOptions.IgnoreCase));
         }
 
-        private static IEnumerable<ImageData> FilterImagesByArch(this IEnumerable<ImageData> imageData)
+        public static IEnumerable<ImageData> FilterMonitorImagesByRuntimeVersion(this IEnumerable<MonitorImageData> imageData)
+        {
+            string versionFilterPattern = GetFilterRegexPattern("IMAGE_VERSION");
+            return imageData
+                .Where(imageData => versionFilterPattern == null
+                    || Regex.IsMatch(imageData.RuntimeVersionString, versionFilterPattern, RegexOptions.IgnoreCase));
+        }
+
+        public static IEnumerable<ImageData> FilterImagesByArch(this IEnumerable<ImageData> imageData)
         {
             string archFilterPattern = GetFilterRegexPattern("IMAGE_ARCH");
             return imageData
@@ -113,7 +172,7 @@ namespace Microsoft.DotNet.Docker.Tests
                     || Regex.IsMatch(Enum.GetName(typeof(Arch), imageData.Arch), archFilterPattern, RegexOptions.IgnoreCase));
         }
 
-        private static IEnumerable<ImageData> FilterImagesByOs(this IEnumerable<ImageData> imageData)
+        public static IEnumerable<ImageData> FilterImagesByOs(this IEnumerable<ImageData> imageData)
         {
             string osFilterPattern = GetFilterRegexPattern("IMAGE_OS");
             return imageData
@@ -124,7 +183,7 @@ namespace Microsoft.DotNet.Docker.Tests
         private static string GetFilterRegexPattern(string filterEnvName)
         {
             string filter = Environment.GetEnvironmentVariable(filterEnvName);
-            return filter != null ? $"^{Regex.Escape(filter).Replace(@"\*", ".*").Replace(@"\?", ".")}$" : null;
+            return Config.GetFilterRegexPattern(filter);
         }
     }
 }

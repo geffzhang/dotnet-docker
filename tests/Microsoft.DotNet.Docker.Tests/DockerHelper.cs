@@ -4,7 +4,6 @@
 
 using System;
 using System.Diagnostics;
-using System.Text;
 using System.Threading;
 using Xunit.Abstractions;
 
@@ -99,45 +98,7 @@ namespace Microsoft.DotNet.Docker.Tests
         }
 
         private static (Process Process, string StdOut, string StdErr) ExecuteProcess(
-            string args, ITestOutputHelper outputHelper)
-        {
-            Process process = new Process
-            {
-                EnableRaisingEvents = true,
-                StartInfo =
-                {
-                    FileName = "docker",
-                    Arguments = args,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                }
-            };
-
-            StringBuilder stdOutput = new StringBuilder();
-            process.OutputDataReceived += new DataReceivedEventHandler((sender, e) => stdOutput.AppendLine(e.Data));
-
-            StringBuilder stdError = new StringBuilder();
-            process.ErrorDataReceived += new DataReceivedEventHandler((sender, e) => stdError.AppendLine(e.Data));
-
-            process.Start();
-            process.BeginOutputReadLine();
-            process.BeginErrorReadLine();
-            process.WaitForExit();
-
-            string output = stdOutput.ToString().Trim();
-            if (outputHelper != null && !string.IsNullOrWhiteSpace(output))
-            {
-                outputHelper.WriteLine(output);
-            }
-
-            string error = stdError.ToString().Trim();
-            if (outputHelper != null && !string.IsNullOrWhiteSpace(error))
-            {
-                outputHelper.WriteLine(error);
-            }
-
-            return (process, output, error);
-        }
+            string args, ITestOutputHelper outputHelper) => ExecuteHelper.ExecuteProcess("docker", args, outputHelper);
 
         private string ExecuteWithLogging(string args, bool ignoreErrors = false, bool autoRetry = false)
         {
@@ -188,8 +149,15 @@ namespace Microsoft.DotNet.Docker.Tests
         private static string GetDockerOS() => Execute("version -f \"{{ .Server.Os }}\"");
         private static string GetDockerArch() => Execute("version -f \"{{ .Server.Arch }}\"");
 
-        public string GetContainerAddress(string container) =>
-            ExecuteWithLogging("inspect -f \"{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}\" " + container);
+        public string GetContainerAddress(string container)
+        {
+            string containerAddress = ExecuteWithLogging("inspect -f \"{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}\" " + container);
+            if (String.IsNullOrWhiteSpace(containerAddress)){
+                containerAddress = ExecuteWithLogging("inspect -f \"{{.NetworkSettings.Networks.nat.IPAddress }}\" " + container);
+            }
+
+            return containerAddress;
+        }
 
         public string GetContainerHostPort(string container, int containerPort = 80) =>
             ExecuteWithLogging(
@@ -227,6 +195,16 @@ namespace Microsoft.DotNet.Docker.Tests
             string workdirArg = workdir == null ? string.Empty : $" -w {workdir}";
             return ExecuteWithLogging(
                 $"run --name {name}{cleanupArg}{workdirArg}{userArg}{detachArg} {optionalRunArgs} {image} {command}");
+        }
+
+        public string CreateVolume(string name)
+        {
+            return ExecuteWithLogging($"volume create {name}");
+        }
+
+        public string DeleteVolume(string name)
+        {
+            return ExecuteWithLogging($"volume remove {name}");
         }
     }
 }

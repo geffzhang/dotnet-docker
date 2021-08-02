@@ -24,7 +24,7 @@ steps:
       targetPath: $(Build.ArtifactStagingDirectory)
 - powershell: >
     $(testScriptPath)
-    -Version '$(dotnetVersion)'
+    -Version '$(productVersion)'
     -OS '$(osVariant)'
     $(optionalTestArgs)
   displayName: Test Images
@@ -39,9 +39,9 @@ steps:
   continueOnError: true
   inputs:
     testRunner: vSTest
-    testResultsFiles: 'tests/**/*.trx'
+    testResultsFiles: '$(testResultsDirectory)/**/*.trx'
     mergeTestResults: true
     publishRunAttachments: true
-    testRunTitle: $(dotnetVersion) $(osVariant) amd64
+    testRunTitle: $(productVersion) $(osVariant) amd64
 - ${{ if eq(variables['System.TeamProject'], 'internal') }}:
   - template: cleanup-docker-windows.yml

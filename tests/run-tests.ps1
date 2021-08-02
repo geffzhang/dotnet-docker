@@ -14,8 +14,8 @@ param(
     [switch]$DisableHttpVerification,
     [switch]$PullImages,
     [string]$ImageInfoPath,
-    [ValidateSet("runtime", "runtime-deps", "aspnet", "sdk", "sample", "image-size")]
-    [string[]]$TestCategories = @("runtime", "runtime-deps", "aspnet", "sdk")
+    [ValidateSet("runtime", "runtime-deps", "aspnet", "sdk", "pre-build", "sample", "image-size", "monitor")]
+    [string[]]$TestCategories = @("runtime", "runtime-deps", "aspnet", "sdk", "monitor")
 )
 
 function Log {
@@ -37,35 +37,15 @@ function Exec {
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+$EngCommonDir = "$PSScriptRoot/../eng/common"
+
 $DotnetInstallDir = "$PSScriptRoot/../.dotnet"
+& $EngCommonDir/Install-DotNetSdk.ps1 -InstallPath $DotnetInstallDir
 
-if (!(Test-Path "$DotnetInstallDir")) {
-    mkdir "$DotnetInstallDir" | Out-Null
-}
+# Ensure that ImageBuilder image is pulled because some tests require it
+& $EngCommonDir/Get-ImageBuilder.ps1
 
-# Install the .NET Core SDK
-$IsRunningOnUnix = $PSVersionTable.contains("Platform") -and $PSVersionTable.Platform -eq "Unix"
-if ($IsRunningOnUnix) {
-    $DotnetInstallScript = "dotnet-install.sh"
-}
-else {
-    $DotnetInstallScript = "dotnet-install.ps1"
-}
-
-if (!(Test-Path $DotnetInstallScript)) {
-    $DOTNET_INSTALL_SCRIPT_URL = "https://dot.net/v1/$DotnetInstallScript"
-    Invoke-WebRequest $DOTNET_INSTALL_SCRIPT_URL -OutFile $DotnetInstallDir/$DotnetInstallScript
-}
-
-if ($IsRunningOnUnix) {
-    & chmod +x $DotnetInstallDir/$DotnetInstallScript
-    & $DotnetInstallDir/$DotnetInstallScript --channel "3.1" --version "latest" --architecture x64 --install-dir $DotnetInstallDir
-}
-else {
-    & $DotnetInstallDir/$DotnetInstallScript -Channel "3.1" -Version "latest" -Architecture x64 -InstallDir $DotnetInstallDir
-}
-
-if ($LASTEXITCODE -ne 0) { throw "Failed to install the .NET Core SDK" }
+$activeOS = docker version -f "{{ .Server.Os }}"
 
 Push-Location "$PSScriptRoot\Microsoft.DotNet.Docker.Tests"
 
@@ -95,6 +75,7 @@ Try {
     $env:REGISTRY = $Registry
     $env:REPO_PREFIX = $RepoPrefix
     $env:IMAGE_INFO_PATH = $ImageInfoPath
+    $env:SOURCE_REPO_ROOT = (Get-Item "$PSScriptRoot").Parent.FullName
 
     $env:DOTNET_CLI_TELEMETRY_OPTOUT = 1
     $env:DOTNET_SKIP_FIRST_TIME_EXPERIENCE = 1
@@ -106,11 +87,20 @@ Try {
         # selected TestCategories (using an OR operator between each category).
         # See https://docs.microsoft.com/en-us/dotnet/core/testing/selective-unit-tests
         $TestCategories | foreach {
-            if ($testFilter) {
-                $testFilter += "|"
-            }
+            # Skip pre-build tests on Windows because of missing pre-reqs (https://github.com/dotnet/dotnet-docker/issues/2261)
+            if ($_ -eq "pre-build" -and $activeOS -eq "windows") {
+                Write-Warning "Skipping pre-build tests for Windows containers"
+            } else {
+                if ($testFilter) {
+                    $testFilter += "|"
+                }
 
-            $testFilter += "Category=$_"
+                $testFilter += "Category=$_"
+            }
+        }
+
+        if (-not $testFilter) {
+            exit;
         }
 
         $testFilter = "--filter `"$testFilter`""

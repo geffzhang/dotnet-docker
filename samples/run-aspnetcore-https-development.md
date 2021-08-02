@@ -2,7 +2,7 @@
 
 ASP.NET Core uses [HTTPS by default](https://docs.microsoft.com/aspnet/core/security/enforcing-ssl). [HTTPS](https://en.wikipedia.org/wiki/HTTPS) relies on [certificates](https://en.wikipedia.org/wiki/Public_key_certificate) for trust, identity, and encryption.
 
-This document demonstrates how to develop ASP.NET Core applications with HTTPS in Docker containers. It is recommended to try the [ASP.NET Core Docker Sample](README.md) first, which is simpler because the container only exposes HTTP. The more basic will help you validate that you have the sample working correctly before adding the complication of certificates.
+This document demonstrates how to develop ASP.NET Core applications with HTTPS in Docker containers. It is recommended to try the [ASP.NET Core Docker Sample](README.md) first, which is simpler because the container only exposes HTTP. This more basic tutorial will help you validate that you have the sample working correctly, before adding the complication of certificates.
 
 See [Hosting ASP.NET Core Images with Docker over HTTPS](host-aspnetcore-https.md) for production scenarios.
 
@@ -18,7 +18,7 @@ The easiest way to get the sample is by cloning the samples repository with git,
 git clone https://github.com/dotnet/dotnet-docker/
 ```
 
-You can also [download the repository as a zip](https://github.com/dotnet/dotnet-docker/archive/master.zip).
+You can also [download the repository as a zip](https://github.com/dotnet/dotnet-docker/archive/main.zip).
 
 ## Certificates
 
@@ -28,7 +28,7 @@ The instructions volume mount certificates into containers. You can add certific
 
 ## Application Secrets
 
-These instructions assume that your project is configured for [application secrets](https://docs.microsoft.com/aspnet/core/security/app-secrets). The primary requirement is a [UserSecretsId](https://github.com/dotnet/dotnet-docker/blob/master/samples/aspnetapp/aspnetapp/aspnetapp.csproj#L5) element in your project file. If you are using the ASP.NET Core sample in this repo, you don't need to do anything. It is already correctly configured. If you are using your own project file, add an `UserSecretsId` element.
+These instructions assume that your project is configured for [application secrets](https://docs.microsoft.com/aspnet/core/security/app-secrets). The primary requirement is a [UserSecretsId](https://github.com/dotnet/dotnet-docker/blob/main/samples/aspnetapp/aspnetapp/aspnetapp.csproj#L5) element in your project file. If you are using the ASP.NET Core sample in this repo, you don't need to do anything. It is already correctly configured. If you are using your own project file, add an `UserSecretsId` element.
 
 You can add the element manually or use Visual Studio to do it for you. The following image demonstrates the experience in Visual Studio.
 
@@ -46,7 +46,11 @@ Use the following instructions, for your operating system configuration. The com
 
 ![Developer Tools -- Delete cookie](https://user-images.githubusercontent.com/2608468/40246148-875fee5a-5a7c-11e8-9728-7da89a491014.png)
 
+Further, if you're loading SSL certificates and trimming assemblies as part of the publish, you'll also need to update the project file for the sample.  Please see details for how you can [support SSL certificates](https://docs.microsoft.com/en-us/dotnet/core/deploying/trim-self-contained#support-for-ssl-certificates).
+
 ### Windows using Linux containers
+
+The following example uses PowerShell.
 
 Navigate to sample:
 
@@ -57,7 +61,7 @@ cd samples\aspnetapp
 Generate cert and configure local machine:
 
 ```console
-dotnet dev-certs https -ep %USERPROFILE%\.aspnet\https\aspnetapp.pfx -p crypticpassword
+dotnet dev-certs https -ep $env:USERPROFILE\.aspnet\https\aspnetapp.pfx -p crypticpassword
 dotnet dev-certs https --trust
 ```
 
@@ -84,7 +88,7 @@ docker build --pull -t aspnetapp .
 Run the container image with ASP.NET Core configured for HTTPS:
 
 ```console
-docker run --rm -it -p 8000:80 -p 8001:443 -e ASPNETCORE_URLS="https://+;http://+" -e ASPNETCORE_HTTPS_PORT=8001 -e ASPNETCORE_ENVIRONMENT=Development -v %APPDATA%\microsoft\UserSecrets\:/root/.microsoft/usersecrets -v %USERPROFILE%\.aspnet\https:/root/.aspnet/https/ aspnetapp
+docker run --rm -it -p 8000:80 -p 8001:443 -e ASPNETCORE_URLS="https://+;http://+" -e ASPNETCORE_HTTPS_PORT=8001 -e ASPNETCORE_ENVIRONMENT=Development -v $env:APPDATA\microsoft\UserSecrets\:/root/.microsoft/usersecrets -v $env:USERPROFILE\.aspnet\https:/root/.aspnet/https/ aspnetapp
 ```
 
 After the application starts, navigate to `http://localhost:8000` in your web browser.
@@ -168,6 +172,8 @@ After the application starts, navigate to `http://localhost:8000` in your web br
 
 ### Windows using Windows containers
 
+The following example uses PowerShell.
+
 Navigate to sample:
 
 ```console
@@ -177,7 +183,7 @@ cd samples\aspnetapp
 Generate cert and configure local machine:
 
 ```console
-dotnet dev-certs https -ep %USERPROFILE%\.aspnet\https\aspnetapp.pfx -p crypticpassword
+dotnet dev-certs https -ep $env:USERPROFILE\.aspnet\https\aspnetapp.pfx -p crypticpassword
 dotnet dev-certs https --trust
 ```
 
@@ -204,7 +210,9 @@ docker build --pull -t aspnetapp .
 Run the container image with ASP.NET Core configured for HTTPS.
 
 ```console
-docker run --rm -it -p 8000:80 -p 8001:443 -e ASPNETCORE_URLS="https://+;http://+" -e ASPNETCORE_HTTPS_PORT=8001 -e ASPNETCORE_ENVIRONMENT=Development -v %APPDATA%\microsoft\UserSecrets\:C:\Users\ContainerUser\AppData\Roaming\microsoft\UserSecrets -v %USERPROFILE%\.aspnet\https:C:\Users\ContainerUser\AppData\Roaming\ASP.NET\Https aspnetapp
+docker run --rm -it -p 8000:80 -p 8001:443 -e ASPNETCORE_URLS="https://+;http://+" -e ASPNETCORE_HTTPS_PORT=8001 -e ASPNETCORE_ENVIRONMENT=Development -v $env:APPDATA\microsoft\UserSecrets\:C:\Users\ContainerUser\AppData\Roaming\microsoft\UserSecrets -v $env:USERPROFILE\.aspnet\https:C:\Users\ContainerUser\AppData\Roaming\ASP.NET\Https aspnetapp
 ```
 
 After the application starts, navigate to `http://localhost:8000` in your web browser.
+
+> In the case of using https, be sure to check the certificate you're using is trusted on the host. You can start with navigating to https://localhost:8001 in the browser. If you're looking to test https with a domain name (e.g. https://contoso.com:8001), the certificate would also need the appropiate Subject Alternative Name included, and the DNS settings on the host would need to be updated. In the case of using the generated dev certificate, the trusted certificate will be issued from localhost and will not have the SAN added.

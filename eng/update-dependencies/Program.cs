@@ -3,6 +3,8 @@
 
 using System;
 using System.Collections.Generic;
+using System.CommandLine;
+using System.CommandLine.Invocation;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -11,7 +13,6 @@ using LibGit2Sharp;
 using Microsoft.DotNet.VersionTools;
 using Microsoft.DotNet.VersionTools.Automation;
 using Microsoft.DotNet.VersionTools.Automation.GitHubApi;
-using Microsoft.DotNet.VersionTools.BuildManifest.Model;
 using Microsoft.DotNet.VersionTools.Dependencies;
 using Microsoft.DotNet.VersionTools.Dependencies.BuildOutput;
 
@@ -19,24 +20,37 @@ namespace Dotnet.Docker
 {
     public static class Program
     {
-        private const string AspNetCoreBuildInfoName = "aspnet";
-        private const string RuntimeBuildInfoName = "core-setup";
-        private const string SdkBuildInfoName = "cli";
+        public const string VersionsFilename = "manifest.versions.json";
 
-        private static Options Options { get; } = new Options();
+        private static Options Options { get; set; }
         private static string RepoRoot { get; } = Directory.GetCurrentDirectory();
 
-        public static async Task Main(string[] args)
+        public static Task Main(string[] args)
         {
+            RootCommand command = new RootCommand();
+            foreach (Symbol option in Options.GetCliSymbols())
+            {
+                command.Add(option);
+            };
+
+            command.Handler = CommandHandler.Create<Options>(ExecuteAsync);
+
+            return command.InvokeAsync(args);
+        }
+
+        private static async Task ExecuteAsync(Options options)
+        {
+            Options = options;
+
             try
             {
                 ErrorTraceListener errorTraceListener = new ErrorTraceListener();
                 Trace.Listeners.Add(errorTraceListener);
                 Trace.Listeners.Add(new TextWriterTraceListener(Console.Out));
 
-                Options.Parse(args);
-
-                IEnumerable<IDependencyInfo> buildInfos = GetBuildInfo();
+                IEnumerable<IDependencyInfo> buildInfos = Options.ProductVersions
+                    .Select(kvp => CreateDependencyBuildInfo(kvp.Key, kvp.Value))
+                    .ToArray();
                 DependencyUpdateResults updateResults = UpdateFiles(buildInfos);
                 if (updateResults.ChangesDetected())
                 {
@@ -52,7 +66,7 @@ namespace Dotnet.Docker
 
                 if (errorTraceListener.Errors.Any())
                 {
-                    string errors = String.Join(Environment.NewLine, errorTraceListener.Errors);
+                    string errors = string.Join(Environment.NewLine, errorTraceListener.Errors);
                     Console.Error.WriteLine("Failed to update dependencies due to the following errors:");
                     Console.Error.WriteLine(errors);
                     Console.Error.WriteLine();
@@ -62,7 +76,7 @@ namespace Dotnet.Docker
             }
             catch (Exception e)
             {
-                Console.Error.WriteLine($"Failed to update dependencies:{Environment.NewLine}{e.ToString()}");
+                Console.Error.WriteLine($"Failed to update dependencies:{Environment.NewLine}{e}");
                 Environment.Exit(1);
             }
 
@@ -71,40 +85,9 @@ namespace Dotnet.Docker
 
         private static DependencyUpdateResults UpdateFiles(IEnumerable<IDependencyInfo> buildInfos)
         {
-            string buildVersion = buildInfos.GetBuildVersion(RuntimeBuildInfoName) ??
-                buildInfos.GetBuildVersion(SdkBuildInfoName) ??
-                buildInfos.GetBuildVersion(AspNetCoreBuildInfoName);
-            string productVersion = buildVersion.Split('-')[0];
-            string dockerfileVersion = productVersion.Substring(0, productVersion.LastIndexOf('.'));
-            IEnumerable<IDependencyUpdater> updaters = GetUpdaters(dockerfileVersion, buildInfos);
+            IEnumerable<IDependencyUpdater> updaters = GetUpdaters();
 
             return DependencyUpdateUtils.Update(updaters, buildInfos);
-        }
-
-        private static IEnumerable<IDependencyInfo> GetBuildInfo()
-        {
-            List<IDependencyInfo> buildInfo = new List<IDependencyInfo>();
-
-            if (Options.AspnetVersion != null)
-            {
-                buildInfo.Add(CreateDependencyBuildInfo(AspNetCoreBuildInfoName, Options.AspnetVersion));
-            }
-            if (Options.RuntimeVersion != null)
-            {
-                buildInfo.Add(CreateDependencyBuildInfo(RuntimeBuildInfoName, Options.RuntimeVersion));
-            }
-            if (Options.SdkVersion != null)
-            {
-                buildInfo.Add(CreateDependencyBuildInfo(SdkBuildInfoName, Options.SdkVersion));
-            }
-
-            return buildInfo;
-        }
-
-        private static IDependencyInfo CreateDependencyBuildInfo(string name, IEnumerable<BuildIdentity> builds)
-        {
-            BuildIdentity buildId = builds.First(build => string.Equals(build.Name, name, StringComparison.OrdinalIgnoreCase));
-            return CreateDependencyBuildInfo(name, buildId.ProductVersion);
         }
 
         private static IDependencyInfo CreateDependencyBuildInfo(string name, string version)
@@ -122,14 +105,19 @@ namespace Dotnet.Docker
 
         private static async Task CreatePullRequestAsync()
         {
+            // Replace slashes with hyphens for use in naming the branch
+            string versionSourceNameForBranch = Options.VersionSourceName.Replace("/", "-");
+
             GitHubAuth gitHubAuth = new GitHubAuth(Options.GitHubPassword, Options.GitHubUser, Options.GitHubEmail);
             PullRequestCreator prCreator = new PullRequestCreator(gitHubAuth, Options.GitHubUser);
+
+            string branchSuffix = $"UpdateDependencies-{Options.GitHubUpstreamBranch}-From-{versionSourceNameForBranch}";
             PullRequestOptions prOptions = new PullRequestOptions()
             {
-                BranchNamingStrategy = new SingleBranchNamingStrategy($"UpdateDependencies-{Options.GitHubUpstreamBranch}")
+                BranchNamingStrategy = new SingleBranchNamingStrategy(branchSuffix)
             };
 
-            string commitMessage = $"[{Options.GitHubUpstreamBranch}] Update dependencies from dotnet/core-sdk";
+            string commitMessage = $"[{Options.GitHubUpstreamBranch}] Update dependencies from {Options.VersionSourceName}";
             GitHubProject upstreamProject = new GitHubProject(Options.GitHubProject, Options.GitHubUpstreamOwner);
             GitHubBranch upstreamBranch = new GitHubBranch(Options.GitHubUpstreamBranch, upstreamProject);
 
@@ -140,7 +128,7 @@ namespace Dotnet.Docker
                     upstreamBranch.Name,
                     await client.GetMyAuthorIdAsync());
 
-                if (pullRequestToUpdate == null)
+                if (pullRequestToUpdate == null || pullRequestToUpdate.Head.Ref != $"{upstreamBranch.Name}-{branchSuffix}")
                 {
                     await prCreator.CreateOrUpdateAsync(
                         commitMessage,
@@ -208,7 +196,7 @@ namespace Dotnet.Docker
                         CredentialsProvider = (url, user, credTypes) => new UsernamePasswordCredentials
                         {
                             Username = Options.GitHubPassword,
-                            Password = String.Empty
+                            Password = string.Empty
                         }
                     };
 
@@ -260,7 +248,7 @@ namespace Dotnet.Docker
             DirectoryInfo dir = new DirectoryInfo(sourceDirName);
 
             DirectoryInfo[] dirs = dir.GetDirectories()
-                .Where(dir => !dir.Name.StartsWith("."))
+                .Where(dir => dir.Name != ".git")
                 .ToArray();
 
             // If the destination directory doesn't exist, create it.
@@ -285,72 +273,23 @@ namespace Dotnet.Docker
             }
         }
 
-        private static string GetBuildVersion(this IEnumerable<IDependencyInfo> buildInfos, string name)
+        private static IEnumerable<IDependencyUpdater> GetUpdaters()
         {
-            return buildInfos.FirstOrDefault(bi => bi.SimpleName == name)?.SimpleVersion;
-        }
-
-        private static IEnumerable<IDependencyUpdater> GetUpdaters(
-            string dockerfileVersion, IEnumerable<IDependencyInfo> buildInfos)
-        {
-            string[] dockerfiles = Directory.GetFiles(
-                Path.Combine(RepoRoot, dockerfileVersion),
-                "Dockerfile",
-                SearchOption.AllDirectories);
-
-            Trace.TraceInformation("Updating the following Dockerfiles:");
-            Trace.TraceInformation(string.Join(Environment.NewLine, dockerfiles));
-
-            // NOTE: The order in which the updaters are returned/invoked is important as there are cross dependencies 
+            // NOTE: The order in which the updaters are returned/invoked is important as there are cross dependencies
             // (e.g. sha updater requires the version numbers to be updated within the Dockerfiles)
-            List<IDependencyUpdater> manifestBasedUpdaters = new List<IDependencyUpdater>();
-            CreateManifestUpdater(manifestBasedUpdaters, "Sdk", buildInfos, SdkBuildInfoName);
-            CreateManifestUpdater(manifestBasedUpdaters, "Runtime", buildInfos, RuntimeBuildInfoName);
-            manifestBasedUpdaters.Add(new ReadMeUpdater(RepoRoot));
-
-            return CreateDockerfileVariableUpdaters(dockerfiles, buildInfos, VariableHelper.DotnetSdkVersionName, SdkBuildInfoName)
-                .Concat(CreateDockerfileVariableUpdaters(
-                    dockerfiles, buildInfos, VariableHelper.AspNetVersionName, AspNetCoreBuildInfoName))
-                .Concat(CreateDockerfileVariableUpdaters(
-                    dockerfiles, buildInfos, VariableHelper.AspNetCoreVersionName, AspNetCoreBuildInfoName))
-                .Concat(CreateDockerfileVariableUpdaters(
-                    dockerfiles, buildInfos, VariableHelper.DotnetVersionName, RuntimeBuildInfoName))
-                .Concat(dockerfiles.Select(path => DockerfileShaUpdater.CreateProductShaUpdater(path, Options)))
-                .Concat(dockerfiles.Select(path => DockerfileShaUpdater.CreateLzmaShaUpdater(path, Options)))
-                .Concat(manifestBasedUpdaters);
-        }
-
-        private static IEnumerable<IDependencyUpdater> CreateDockerfileVariableUpdaters(
-            string[] dockerfilePaths, IEnumerable<IDependencyInfo> buildInfos, string variableName, string buildInfoName)
-        {
-            return GetBuildVersion(buildInfos, buildInfoName) == null
-                ? Enumerable.Empty<IDependencyUpdater>()
-                : dockerfilePaths.Select(path => CreateDockerfileVariableUpdater(path, variableName, buildInfoName));
-        }
-
-        private static IDependencyUpdater CreateDockerfileVariableUpdater(
-            string dockerfilePath, string variableName, string buildInfoName)
-        {
-            return new FileRegexReleaseUpdater()
+            foreach (string productName in Options.ProductVersions.Keys)
             {
-                Path = dockerfilePath,
-                BuildInfoName = buildInfoName,
-                Regex = VariableHelper.GetValueRegex(variableName),
-                VersionGroupName = VariableHelper.ValueGroupName
-            };
-        }
+                yield return new VersionUpdater(VersionType.Build, productName, Options.DockerfileVersion, RepoRoot);
+                yield return new VersionUpdater(VersionType.Product, productName, Options.DockerfileVersion, RepoRoot);
 
-        private static void CreateManifestUpdater(
-            List<IDependencyUpdater> manifestUpdaters,
-            string imageVariantName,
-            IEnumerable<IDependencyInfo> buildInfos,
-            string buildInfoName)
-        {
-            string version = GetBuildVersion(buildInfos, buildInfoName);
-            if (version != null)
-            {
-                manifestUpdaters.Add(new ManifestUpdater(imageVariantName, version, RepoRoot));
+                foreach (IDependencyUpdater shaUpdater in DockerfileShaUpdater.CreateUpdaters(productName, Options.DockerfileVersion, RepoRoot, Options))
+                {
+                    yield return shaUpdater;
+                }
             }
+
+            yield return ScriptRunnerUpdater.GetDockerfileUpdater(RepoRoot);
+            yield return ScriptRunnerUpdater.GetReadMeUpdater(RepoRoot);
         }
     }
 }
