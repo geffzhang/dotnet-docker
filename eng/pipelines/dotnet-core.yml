@@ -1,10 +1,21 @@
 trigger: none
 pr: none
 
-variables:
-- template: variables/core.yml
+resources:
+  repositories:
+  - repository: InternalVersionsRepo
+    type: github
+    endpoint: dotnet
+    name: dotnet/versions
 
-stages:
-- template: ../common/templates/stages/build-test-publish-repo.yml
+variables:
+- template: /eng/pipelines/variables/core.yml@self
+
+extends:
+  template: /eng/common/templates/1es-official.yml@self
   parameters:
-    testMatrixCustomBuildLegGroupArgs: --custom-build-leg-group test-dependencies
+    stages:
+    - template: /eng/pipelines/stages/build-test-publish-repo.yml@self
+      parameters:
+        internalProjectName: ${{ variables.internalProjectName }}
+        publicProjectName: ${{ variables.publicProjectName }}

@@ -27,6 +27,15 @@ namespace Microsoft.DotNet.Docker.Tests
         }
 
         /// <summary>
+        /// Sets the entrypoint of the container.
+        /// </summary>
+        public DockerRunArgsBuilder Entrypoint(string entrypoint)
+        {
+            _builder.AppendFormat(CultureInfo.InvariantCulture, "--entrypoint {0} ", entrypoint);
+            return this;
+        }
+
+        /// <summary>
         /// Sets the named environment variable with the specified value.
         /// </summary>
         public DockerRunArgsBuilder EnvironmentVariable(string name, string value)
@@ -50,6 +59,12 @@ namespace Microsoft.DotNet.Docker.Tests
         public DockerRunArgsBuilder VolumeMount(string name, string path)
         {
             _builder.AppendFormat(CultureInfo.InvariantCulture, "-v {0}:{1} ", name, path);
+            return this;
+        }
+
+        public DockerRunArgsBuilder AsUser(int uid)
+        {
+            _builder.AppendFormat(CultureInfo.InvariantCulture, "-u {0} ", uid);
             return this;
         }
     }

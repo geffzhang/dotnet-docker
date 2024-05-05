@@ -4,10 +4,11 @@
 
 using System;
 using System.Collections.Generic;
+using System.Data.Common;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
-using System.Net;
+using System.Net.Http;
 using System.Security.Cryptography;
 using System.Threading.Tasks;
 using SharpCompress.Common;
@@ -28,14 +29,67 @@ namespace Microsoft.DotNet.Docker.Tests
         {
         }
 
-        protected override DotNetImageType ImageType => DotNetImageType.SDK;
+        protected override DotNetImageRepo ImageRepo => DotNetImageRepo.SDK;
+
+        private bool IsPowerShellSupported(ProductImageData imageData, out string reason)
+        {
+            if (imageData.OS.Contains("alpine"))
+            {
+                if (imageData.IsArm)
+                {
+                    reason = "PowerShell does not support Arm-based Alpine, skip testing (https://github.com/PowerShell/PowerShell/issues/14667, https://github.com/PowerShell/PowerShell/issues/12937)";
+                    return false;
+                }
+                else if (imageData.Version.Major == 6 && imageData.OS.Contains("3.19"))
+                {
+                    reason = "Powershell does not support Alpine 3.19 yet, skip testing (https://github.com/PowerShell/PowerShell/issues/20945)";
+                    return false;
+                }
+            }
+
+            reason = null;
+            return true;
+        }
 
         public static IEnumerable<object[]> GetImageData()
         {
-            return TestData.GetImageData()
+            return TestData.GetImageData(DotNetImageRepo.SDK)
+                .Where(imageData => !imageData.IsDistroless)
                 // Filter the image data down to the distinct SDK OSes
                 .Distinct(new SdkImageDataEqualityComparer())
                 .Select(imageData => new object[] { imageData });
+        }
+
+        [LinuxImageTheory]
+        [MemberData(nameof(GetImageData))]
+        public async void VerifyBlazorWasmScenario(ProductImageData imageData)
+        {
+            // Disable test since `dotnet workload install` does not work with an empty NuGet config.
+            return;
+
+            bool isAlpine = imageData.OS.StartsWith(OS.Alpine);
+
+            // Microsoft.NETCore.App.Runtime.Mono.linux-musl-arm* package does not exist
+            if (isAlpine && imageData.IsArm)
+            {
+                return;
+            }
+
+            // `wasm-tools` workload does not work on .NET 6 with CBL Mariner 2.0.
+            // Re-enable when issue is resolved: https://github.com/dotnet/aspnetcore/issues/53469
+            if (imageData.OS.Contains(OS.Mariner) && imageData.Version.Major == 6)
+            {
+                return;
+            }
+
+            // `wasm-tools` workload does not work on ARM
+            // `wasm-tools` is also not supported on Alpine for .NET < 9 due to https://github.com/dotnet/sdk/issues/32327
+            int[] unsupportedVersionsForAlpine = [6, 7, 8];
+            bool isSupportedVersionForAlpine = !unsupportedVersionsForAlpine.Contains(imageData.Version.Major);
+            bool useWasmTools = !imageData.IsArm && (!isAlpine || isSupportedVersionForAlpine);
+
+            using BlazorWasmScenario testScenario = new(imageData, DockerHelper, OutputHelper, useWasmTools);
+            await testScenario.ExecuteAsync();
         }
 
         [LinuxImageTheory]
@@ -47,84 +101,40 @@ namespace Microsoft.DotNet.Docker.Tests
 
         [DotNetTheory]
         [MemberData(nameof(GetImageData))]
-        public void VerifyEnvironmentVariables(ProductImageData imageData)
+        public void VerifyNoSasToken(ProductImageData imageData)
         {
-            string aspnetUrlsValue = imageData.Version.Major < 3 ? "http://+:80" : string.Empty;
-            List<EnvironmentVariableInfo> variables = new()
-            {
-                new EnvironmentVariableInfo("ASPNETCORE_URLS", aspnetUrlsValue),
-                new EnvironmentVariableInfo("DOTNET_USE_POLLING_FILE_WATCHER", "true"),
-                new EnvironmentVariableInfo("NUGET_XMLDOC_MODE", "skip")
-            };
-            variables.AddRange(GetCommonEnvironmentVariables());
-
-            if (imageData.Version.Major >= 3)
-            {
-                variables.Add(new EnvironmentVariableInfo("POWERSHELL_DISTRIBUTION_CHANNEL", allowAnyValue: true));
-            }
-
-            if (imageData.Version.Major >= 5 || (imageData.Version.Major == 2 && DockerHelper.IsLinuxContainerModeEnabled))
-            {
-                string version = imageData.GetProductVersion(ImageType, DockerHelper);
-                variables.Add(new EnvironmentVariableInfo("DOTNET_SDK_VERSION", version));
-            }
-
-            if (imageData.Version.Major >= 5)
-            {
-                variables.Add(AspnetImageTests.GetAspnetVersionVariableInfo(imageData, DockerHelper));
-                variables.Add(RuntimeImageTests.GetRuntimeVersionVariableInfo(imageData, DockerHelper));
-            }
-
-            if (imageData.Version.Major >= 6)
-            {
-                variables.Add(new EnvironmentVariableInfo("DOTNET_GENERATE_ASPNET_CERTIFICATE", "false"));
-                variables.Add(new EnvironmentVariableInfo("DOTNET_NOLOGO", "true"));
-                variables.Add(new EnvironmentVariableInfo("Logging__Console__FormatterName", string.Empty));
-            }
-
-            if (imageData.SdkOS.StartsWith(OS.AlpinePrefix))
-            {
-                variables.Add(new EnvironmentVariableInfo("DOTNET_SYSTEM_GLOBALIZATION_INVARIANT", "false"));
-
-                if (imageData.Version.Major < 5)
-                {
-                    variables.Add(new EnvironmentVariableInfo("LC_ALL", "en_US.UTF-8"));
-                    variables.Add(new EnvironmentVariableInfo("LANG", "en_US.UTF-8"));
-                }
-            }
-
-            EnvironmentVariableInfo.Validate(variables, imageData.GetImage(DotNetImageType.SDK, DockerHelper), imageData, DockerHelper);
+            base.VerifyCommonNoSasToken(imageData);
         }
 
         [DotNetTheory]
         [MemberData(nameof(GetImageData))]
-        public void VerifyPackageCache(ProductImageData imageData)
+        public void VerifyEnvironmentVariables(ProductImageData imageData)
         {
-            string verifyCacheCommand = null;
-            if (imageData.Version.Major == 2)
+            string imageName = imageData.GetImage(ImageRepo, DockerHelper);
+            string version = imageData.GetProductVersion(ImageRepo, ImageRepo, DockerHelper);
+
+            List<EnvironmentVariableInfo> variables = new()
             {
-                if (DockerHelper.IsLinuxContainerModeEnabled)
+                new EnvironmentVariableInfo("DOTNET_GENERATE_ASPNET_CERTIFICATE", "false"),
+                new EnvironmentVariableInfo("DOTNET_USE_POLLING_FILE_WATCHER", "true"),
+                new EnvironmentVariableInfo("NUGET_XMLDOC_MODE", "skip"),
+                new EnvironmentVariableInfo("POWERSHELL_DISTRIBUTION_CHANNEL", allowAnyValue: true),
+                new EnvironmentVariableInfo("DOTNET_SDK_VERSION", version)
                 {
-                    verifyCacheCommand = "test -d /usr/share/dotnet/sdk/NuGetFallbackFolder";
-                }
-                else
-                {
-                    verifyCacheCommand = "CMD /S /C PUSHD \"C:\\Program Files\\dotnet\\sdk\\NuGetFallbackFolder\"";
-                }
-            }
-            else
+                    IsProductVersion = true
+                },
+                AspnetImageTests.GetAspnetVersionVariableInfo(ImageRepo, imageData, DockerHelper),
+                RuntimeImageTests.GetRuntimeVersionVariableInfo(ImageRepo, imageData, DockerHelper),
+                new EnvironmentVariableInfo("DOTNET_NOLOGO", "true")
+            };
+            variables.AddRange(GetCommonEnvironmentVariables());
+
+            if (imageData.SdkOS.StartsWith(OS.Alpine))
             {
-                OutputHelper.WriteLine(".NET Core SDK images >= 3.0 don't include a package cache.");
+                variables.Add(new EnvironmentVariableInfo("DOTNET_SYSTEM_GLOBALIZATION_INVARIANT", "false"));
             }
 
-            if (verifyCacheCommand != null)
-            {
-                // Simple check to verify the NuGet package cache was created
-                DockerHelper.Run(
-                    image: imageData.GetImage(DotNetImageType.SDK, DockerHelper),
-                    command: verifyCacheCommand,
-                    name: imageData.GetIdentifier("PackageCache"));
-            }
+            EnvironmentVariableInfo.Validate(variables, imageName, imageData, DockerHelper);
         }
 
         [DotNetTheory]
@@ -155,28 +165,20 @@ namespace Microsoft.DotNet.Docker.Tests
         [MemberData(nameof(GetImageData))]
         public async Task VerifyDotnetFolderContents(ProductImageData imageData)
         {
-            // Disable this test for Arm-based Alpine on 6.0 until PowerShell has support (https://github.com/PowerShell/PowerShell/issues/14667, https://github.com/PowerShell/PowerShell/issues/12937)
-            if (imageData.Version.Major == 6 && imageData.OS.Contains("alpine") && imageData.IsArm)
+            if (!IsPowerShellSupported(imageData, out string powerShellReason))
             {
+                OutputHelper.WriteLine(powerShellReason);
                 return;
             }
 
-            // Disable test on Windows due to PowerShell crash (https://github.com/dotnet/runtime/issues/53298)
-            if (imageData.Version.Major == 6 && !DockerHelper.IsLinuxContainerModeEnabled)
-            {
-                return;
-            }
-
-            // Skip test on CBL-Mariner for 6.0. Since installation is done via RPM package, we just need to verify the package installation
+            // Skip test on CBL-Mariner. Since installation is done via RPM package, we just need to verify the package installation
             // was done (handled by VerifyPackageInstallation test). There's no need to check the actual contents of the package.
-            if (imageData.Version.Major == 6 && imageData.OS.Contains("cbl-mariner"))
+            if (imageData.OS.Contains("cbl-mariner"))
             {
                 return;
             }
 
-            if (!(imageData.Version.Major >= 5 ||
-                (imageData.Version.Major >= 3 &&
-                    (imageData.SdkOS.StartsWith(OS.AlpinePrefix) || !DockerHelper.IsLinuxContainerModeEnabled))))
+            if (!imageData.SdkOS.StartsWith(OS.Alpine) && DockerHelper.IsLinuxContainerModeEnabled)
             {
                 return;
             }
@@ -223,9 +225,9 @@ namespace Microsoft.DotNet.Docker.Tests
 
         [DotNetTheory]
         [MemberData(nameof(GetImageData))]
-        public void VerifyPackageInstallation(ProductImageData imageData)
+        public void VerifyInstalledRpmPackages(ProductImageData imageData)
         {
-            if (!(imageData.OS.Contains("cbl-mariner") && imageData.Version.Major >= 6))
+            if (!imageData.OS.Contains("cbl-mariner") || imageData.IsDistroless || imageData.Version.Major > 6)
             {
                 return;
             }
@@ -241,6 +243,55 @@ namespace Microsoft.DotNet.Docker.Tests
                     $"netstandard-targeting-pack-2.1"
                 }
                 .Concat(AspnetImageTests.GetExpectedRpmPackagesInstalled(imageData)));
+        }
+
+        [LinuxImageTheory]
+        [MemberData(nameof(GetImageData))]
+        public void VerifyInstalledPackages(ProductImageData imageData)
+        {
+            ProductImageTests.VerifyInstalledPackagesBase(imageData, ImageRepo, DockerHelper, OutputHelper);
+        }
+
+        [DotNetTheory]
+        [MemberData(nameof(GetImageData))]
+        public void VerifyDefaultUser(ProductImageData imageData)
+        {
+            VerifyCommonDefaultUser(imageData);
+        }
+
+        /// <summary>
+        /// Verifies that a git command can be executed without failure.
+        /// </summary>
+        [DotNetTheory]
+        [MemberData(nameof(GetImageData))]
+        public void VerifyGitInstallation(ProductImageData imageData)
+        {
+            if (!DockerHelper.IsLinuxContainerModeEnabled && imageData.Version.Major == 6)
+            {
+                OutputHelper.WriteLine("Git is not installed on Windows containers older than .NET 7");
+                return;
+            }
+
+            DockerHelper.Run(
+                image: imageData.GetImage(DotNetImageRepo.SDK, DockerHelper),
+                name: imageData.GetIdentifier($"git"),
+                command: "git version"
+            );
+        }
+
+        /// <summary>
+        /// Verifies that a tar command can be executed without failure.
+        /// </summary>
+        [DotNetTheory]
+        [MemberData(nameof(GetImageData))]
+        public void VerifyTarInstallation(ProductImageData imageData)
+        {
+            // tar should exist in the SDK for both Linux and Windows. The --version option works in either OS
+            DockerHelper.Run(
+                image: imageData.GetImage(DotNetImageRepo.SDK, DockerHelper),
+                name: imageData.GetIdentifier("tar"),
+                command: "tar --version"
+            );
         }
 
         private IEnumerable<SdkContentFileInfo> GetActualSdkContents(ProductImageData imageData)
@@ -264,7 +315,7 @@ namespace Microsoft.DotNet.Docker.Tests
             string command = $"pwsh -Command \"{powerShellCommand}\"";
 
             string containerFileList = DockerHelper.Run(
-                image: imageData.GetImage(ImageType, DockerHelper),
+                image: imageData.GetImage(ImageRepo, DockerHelper),
                 command: command,
                 name: imageData.GetIdentifier("DotnetFolder"));
 
@@ -300,33 +351,14 @@ namespace Microsoft.DotNet.Docker.Tests
 
         private async Task<IEnumerable<SdkContentFileInfo>> GetExpectedSdkContentsAsync(ProductImageData imageData)
         {
-            string sdkVersion = imageData.GetProductVersion(ImageType, DockerHelper);
-
-            string osType = DockerHelper.IsLinuxContainerModeEnabled ? "linux" : "win";
-            if (imageData.SdkOS.StartsWith(OS.AlpinePrefix))
-            {
-                osType += "-musl";
-            }
-
-            string fileType = DockerHelper.IsLinuxContainerModeEnabled ? "tar.gz" : "zip";
-
-            string architecture = imageData.Arch switch
-            {
-                Arch.Amd64 => "x64",
-                Arch.Arm => "arm",
-                Arch.Arm64 => "arm64",
-                _ => throw new InvalidOperationException($"Unexpected architecture type: '{imageData.Arch}'"),
-            };
-
-            string sdkUrl =
-                $"https://dotnetcli.azureedge.net/dotnet/Sdk/{sdkVersion}/dotnet-sdk-{sdkVersion}-{osType}-{architecture}.{fileType}";
+            string sdkUrl = GetSdkUrl(imageData);
 
             if (!s_sdkContentsCache.TryGetValue(sdkUrl, out IEnumerable<SdkContentFileInfo> files))
             {
                 string sdkFile = Path.GetTempFileName();
 
-                using WebClient webClient = new WebClient();
-                await webClient.DownloadFileTaskAsync(new Uri(sdkUrl), sdkFile);
+                using HttpClient httpClient = new();
+                await httpClient.DownloadFileAsync(new Uri(sdkUrl), sdkFile);
 
                 files = EnumerateArchiveContents(sdkFile)
                     .OrderBy(file => file.Path)
@@ -338,24 +370,50 @@ namespace Microsoft.DotNet.Docker.Tests
             return files;
         }
 
-        private void PowerShellScenario_Execute(ProductImageData imageData, string optionalArgs)
+        private string GetSdkUrl(ProductImageData imageData)
         {
-            if (imageData.Version.Major < 3)
+            bool isInternal = Config.IsInternal(imageData.VersionString);
+            string sdkBuildVersion = Config.GetBuildVersion(ImageRepo, imageData.VersionString);
+            string sdkFileVersionLabel = isInternal
+                    ? imageData.GetProductVersion(ImageRepo, ImageRepo, DockerHelper)
+                    : sdkBuildVersion;
+
+            string osType = DockerHelper.IsLinuxContainerModeEnabled ? "linux" : "win";
+            if (imageData.SdkOS.StartsWith(OS.Alpine))
             {
-                OutputHelper.WriteLine("PowerShell does not exist in pre-3.0 images, skip testing");
-                return;
+                osType += "-musl";
             }
 
-            // Disable this test for Arm-based Alpine on 6.0 until PowerShell has support (https://github.com/PowerShell/PowerShell/issues/14667, https://github.com/PowerShell/PowerShell/issues/12937)
-            if (imageData.Version.Major == 6 && imageData.OS.Contains("alpine") && imageData.IsArm)
+            string architecture = imageData.Arch switch
             {
-                OutputHelper.WriteLine("PowerShell does not have Alpine arm images, skip testing");
+                Arch.Amd64 => "x64",
+                Arch.Arm => "arm",
+                Arch.Arm64 => "arm64",
+                _ => throw new InvalidOperationException($"Unexpected architecture type: '{imageData.Arch}'"),
+            };
+
+            string fileType = DockerHelper.IsLinuxContainerModeEnabled ? "tar.gz" : "zip";
+            string baseUrl = Config.GetBaseUrl(imageData.VersionString);
+            string url = $"{baseUrl}/Sdk/{sdkBuildVersion}/dotnet-sdk-{sdkFileVersionLabel}-{osType}-{architecture}.{fileType}";
+            if (isInternal)
+            {
+                url += Config.SasQueryString;
+            }
+
+            return url;
+        }
+
+        private void PowerShellScenario_Execute(ProductImageData imageData, string optionalArgs)
+        {
+            if (!IsPowerShellSupported(imageData, out string powershellReason))
+            {
+                OutputHelper.WriteLine(powershellReason);
                 return;
             }
 
             // A basic test which executes an arbitrary command to validate PS is functional
             string output = DockerHelper.Run(
-                image: imageData.GetImage(DotNetImageType.SDK, DockerHelper),
+                image: imageData.GetImage(DotNetImageRepo.SDK, DockerHelper),
                 name: imageData.GetIdentifier($"pwsh"),
                 optionalRunArgs: optionalArgs,
                 command: $"pwsh -c (Get-Childitem env:DOTNET_RUNNING_IN_CONTAINER).Value"

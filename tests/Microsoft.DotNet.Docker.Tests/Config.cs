@@ -11,7 +11,10 @@ namespace Microsoft.DotNet.Docker.Tests
 {
     public static class Config
     {
-        private static Lazy<JObject> Manifest { get; } = new Lazy<JObject>(() => LoadManifest());
+        private const string VariableGroupName = "variable";
+        private const string VariablePattern = $"\\$\\((?<{VariableGroupName}>[\\w:\\-.|]+)\\)";
+        private static Lazy<JObject> Manifest { get; } = new Lazy<JObject>(() => LoadManifest("manifest.json"));
+        private static Lazy<JObject> ManifestVersions { get; } = new Lazy<JObject>(() => LoadManifest("manifest.versions.json"));
 
         public static string SourceRepoRoot { get; } = Environment.GetEnvironmentVariable("SOURCE_REPO_ROOT") ?? string.Empty;
         public static bool IsHttpVerificationDisabled { get; } =
@@ -23,8 +26,23 @@ namespace Microsoft.DotNet.Docker.Tests
         public static string RepoPrefix { get; } = Environment.GetEnvironmentVariable("REPO_PREFIX") ?? string.Empty;
         public static string Registry { get; } =
             Environment.GetEnvironmentVariable("REGISTRY") ?? (string)Manifest.Value["registry"];
-        public static string Os { get; } =
-            Environment.GetEnvironmentVariable("IMAGE_OS") ?? string.Empty;
+        public static string[] OsNames { get; } =
+            (Environment.GetEnvironmentVariable("IMAGE_OS_NAMES") ?? string.Empty).Split(",", StringSplitOptions.RemoveEmptyEntries);
+        public static string SourceBranch { get; } =
+            Environment.GetEnvironmentVariable("SOURCE_BRANCH") ?? string.Empty;
+        public static string SasQueryString { get; } =
+            Environment.GetEnvironmentVariable("SAS_QUERY_STRING") ?? string.Empty;
+        public static string NuGetFeedPassword { get; } =
+            Environment.GetEnvironmentVariable("NUGET_FEED_PASSWORD") ?? string.Empty;
+        public static string[] Paths { get; } =
+            Environment.GetEnvironmentVariable("DOCKERFILE_PATHS")?
+                .Split(',', StringSplitOptions.RemoveEmptyEntries) ?? Array.Empty<string>();
+
+        public static bool IsInternal(string dotnetVersion)
+        {
+            string versionBaseUrl = GetBaseUrl(dotnetVersion);
+            return versionBaseUrl.Contains("msrc") || versionBaseUrl.Contains("internal");
+        }
 
         private static bool GetIsNightlyRepo()
         {
@@ -32,11 +50,45 @@ namespace Microsoft.DotNet.Docker.Tests
             return repo.Contains("/nightly/");
         }
 
-        private static JObject LoadManifest()
+        private static JObject LoadManifest(string manifestFile)
         {
-            string manifestPath = Path.Combine(SourceRepoRoot, "manifest.json");
+            string manifestPath = Path.Combine(SourceRepoRoot, manifestFile);
             string manifestJson = File.ReadAllText(manifestPath);
             return JObject.Parse(manifestJson);
+        }
+
+        public static string GetVariableValue(string variableName) =>
+            GetVariableValue(variableName, (JObject)ManifestVersions.Value["variables"]);
+
+        private static string GetVariableValue(string variableName, JObject variables) =>
+            ResolveVariables((string)variables[variableName], variables);
+
+        private static string ResolveVariables(string value, JObject variables)
+        {
+            MatchCollection matches = Regex.Matches(value, VariablePattern);
+            foreach (Match match in matches)
+            {
+                string variableName = match.Groups[VariableGroupName].Value;
+                string variableValue = GetVariableValue(variableName, variables);
+                value = value.Replace(match.Value, variableValue);
+            }
+
+            return value;
+        }
+
+        public static string GetBaseUrl(string dotnetVersion) =>
+            GetVariableValue($"base-url|{dotnetVersion}|{Config.SourceBranch}", (JObject)ManifestVersions.Value["variables"]);
+
+        public static string GetBuildVersion(DotNetImageRepo imageRepo, string dotnetVersion)
+        {
+            if (imageRepo == DotNetImageRepo.Runtime_Deps)
+            {
+                throw new NotSupportedException("Runtime deps has no associated build version");
+            }
+
+            return GetVariableValue(
+                $"{imageRepo.ToString().ToLower()}|{dotnetVersion}|build-version",
+                (JObject)ManifestVersions.Value["variables"]);
         }
 
         public static string GetFilterRegexPattern(string filter) =>

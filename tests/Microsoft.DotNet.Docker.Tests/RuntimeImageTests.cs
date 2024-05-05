@@ -18,26 +18,33 @@ namespace Microsoft.DotNet.Docker.Tests
         {
         }
 
-        protected override DotNetImageType ImageType => DotNetImageType.Runtime;
+        protected override DotNetImageRepo ImageRepo => DotNetImageRepo.Runtime;
+
+        public static IEnumerable<object[]> GetImageData() => GetImageData(DotNetImageRepo.Runtime);
 
         [DotNetTheory]
         [MemberData(nameof(GetImageData))]
         public async Task VerifyAppScenario(ProductImageData imageData)
         {
-            ImageScenarioVerifier verifier = new ImageScenarioVerifier(imageData, DockerHelper, OutputHelper);
-            await verifier.Execute();
+            if (imageData.IsArm && imageData.OS == OS.Jammy)
+            {
+                OutputHelper.WriteLine(
+                    "Skipping test due to https://github.com/dotnet/runtime/issues/66310. Re-enable when fixed.");
+                return;
+            }
+
+            using ConsoleAppScenario testScenario = new(imageData, DockerHelper, OutputHelper);
+            await testScenario.ExecuteAsync();
         }
 
         [DotNetTheory]
         [MemberData(nameof(GetImageData))]
         public void VerifyEnvironmentVariables(ProductImageData imageData)
         {
-            List<EnvironmentVariableInfo> variables = new List<EnvironmentVariableInfo>();
-
-            if (imageData.Version.Major >= 5 || (imageData.Version.Major == 2 && DockerHelper.IsLinuxContainerModeEnabled))
+            List<EnvironmentVariableInfo> variables = new List<EnvironmentVariableInfo>
             {
-                variables.Add(GetRuntimeVersionVariableInfo(imageData, DockerHelper));
-            }
+                GetRuntimeVersionVariableInfo(ImageRepo, imageData, DockerHelper)
+            };
 
             base.VerifyCommonEnvironmentVariables(imageData, variables);
         }
@@ -46,7 +53,7 @@ namespace Microsoft.DotNet.Docker.Tests
         [MemberData(nameof(GetImageData))]
         public void VerifyPackageInstallation(ProductImageData imageData)
         {
-            if (!(imageData.OS.Contains("cbl-mariner") && imageData.Version.Major >= 6))
+            if (!imageData.OS.Contains("cbl-mariner") || imageData.IsDistroless || imageData.Version.Major > 6)
             {
                 return;
             }
@@ -57,10 +64,49 @@ namespace Microsoft.DotNet.Docker.Tests
                     .Concat(RuntimeDepsImageTests.GetExpectedRpmPackagesInstalled(imageData)));
         }
 
-        public static EnvironmentVariableInfo GetRuntimeVersionVariableInfo(ProductImageData imageData, DockerHelper dockerHelper)
+        [LinuxImageTheory]
+        [MemberData(nameof(GetImageData))]
+        public void VerifyInstalledPackages(ProductImageData imageData)
         {
-            string version = imageData.GetProductVersion(DotNetImageType.Runtime, dockerHelper);
-            return new EnvironmentVariableInfo("DOTNET_VERSION", version);
+            ProductImageTests.VerifyInstalledPackagesBase(imageData, ImageRepo, DockerHelper, OutputHelper);
+        }
+
+        [LinuxImageTheory]
+        [MemberData(nameof(GetImageData))]
+        public void VerifyInsecureFiles(ProductImageData imageData)
+        {
+            base.VerifyCommonInsecureFiles(imageData);
+        }
+
+        [LinuxImageTheory]
+        [MemberData(nameof(GetImageData))]
+        public void VerifyShellNotInstalledForDistroless(ProductImageData imageData)
+        {
+            base.VerifyCommonShellNotInstalledForDistroless(imageData);
+        }
+
+        [DotNetTheory]
+        [MemberData(nameof(GetImageData))]
+        public void VerifyNoSasToken(ProductImageData imageData)
+        {
+            base.VerifyCommonNoSasToken(imageData);
+        }
+
+        [DotNetTheory]
+        [MemberData(nameof(GetImageData))]
+        public void VerifyDefaultUser(ProductImageData imageData)
+        {
+            VerifyCommonDefaultUser(imageData);
+        }
+
+        public static EnvironmentVariableInfo GetRuntimeVersionVariableInfo(
+            DotNetImageRepo imageRepo, ProductImageData imageData, DockerHelper dockerHelper)
+        {
+            string version = imageData.GetProductVersion(imageRepo, DotNetImageRepo.Runtime, dockerHelper);
+            return new EnvironmentVariableInfo("DOTNET_VERSION", version)
+            {
+                IsProductVersion = true
+            };
         }
 
         internal static string[] GetExpectedRpmPackagesInstalled(ProductImageData imageData) =>

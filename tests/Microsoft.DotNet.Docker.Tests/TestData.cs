@@ -14,115 +14,331 @@ namespace Microsoft.DotNet.Docker.Tests
     {
         private static readonly ProductImageData[] s_linuxTestData =
         {
-            new ProductImageData { Version = V2_1, OS = OS.StretchSlim,  Arch = Arch.Amd64 },
-            new ProductImageData { Version = V2_1, OS = OS.Bionic,       Arch = Arch.Amd64 },
-            new ProductImageData { Version = V2_1, OS = OS.Focal,        Arch = Arch.Amd64 },
-            new ProductImageData { Version = V2_1, OS = OS.Alpine313,    Arch = Arch.Amd64 },
-            new ProductImageData { Version = V2_1, OS = OS.StretchSlim,  Arch = Arch.Arm },
-            new ProductImageData { Version = V2_1, OS = OS.Bionic,       Arch = Arch.Arm },
-            new ProductImageData { Version = V2_1, OS = OS.Focal,        Arch = Arch.Arm },
-            new ProductImageData { Version = V3_1, OS = OS.BusterSlim,   Arch = Arch.Amd64 },
-            new ProductImageData { Version = V3_1, OS = OS.Bionic,       Arch = Arch.Amd64 },
-            new ProductImageData { Version = V3_1, OS = OS.Focal,        Arch = Arch.Amd64 },
-            new ProductImageData { Version = V3_1, OS = OS.Alpine313,    Arch = Arch.Amd64 },
-            new ProductImageData { Version = V3_1, OS = OS.BusterSlim,   Arch = Arch.Arm },
-            new ProductImageData { Version = V3_1, OS = OS.Bionic,       Arch = Arch.Arm },
-            new ProductImageData { Version = V3_1, OS = OS.Focal,        Arch = Arch.Arm },
-            new ProductImageData { Version = V3_1, OS = OS.BusterSlim,   Arch = Arch.Arm64 },
-            new ProductImageData { Version = V3_1, OS = OS.Bionic,       Arch = Arch.Arm64 },
-            new ProductImageData { Version = V3_1, OS = OS.Focal,        Arch = Arch.Arm64 },
-            new ProductImageData { Version = V3_1, OS = OS.Alpine313,    Arch = Arch.Arm64,   SdkOS = OS.Buster },
-            new ProductImageData { Version = V3_1, OS = OS.Mariner10,    Arch = Arch.Amd64 },
-            new ProductImageData { Version = V5_0, OS = OS.BusterSlim,   Arch = Arch.Amd64 },
-            new ProductImageData { Version = V5_0, OS = OS.Focal,        Arch = Arch.Amd64 },
-            new ProductImageData { Version = V5_0, OS = OS.Alpine313,    Arch = Arch.Amd64 },
-            new ProductImageData { Version = V5_0, OS = OS.Mariner10,    Arch = Arch.Amd64 },
-            new ProductImageData { Version = V5_0, OS = OS.BusterSlim,   Arch = Arch.Arm },
-            new ProductImageData { Version = V5_0, OS = OS.BusterSlim,   Arch = Arch.Arm64 },
-            new ProductImageData { Version = V5_0, OS = OS.Focal,        Arch = Arch.Arm },
-            new ProductImageData { Version = V5_0, OS = OS.Focal,        Arch = Arch.Arm64 },
-            new ProductImageData { Version = V5_0, OS = OS.Alpine313,    Arch = Arch.Arm64,   SdkOS = OS.BusterSlim },
-            new ProductImageData { Version = V6_0, OS = OS.BullseyeSlim, Arch = Arch.Amd64 },
-            new ProductImageData { Version = V6_0, OS = OS.Focal,        Arch = Arch.Amd64 },
-            new ProductImageData { Version = V6_0, OS = OS.Alpine313,    Arch = Arch.Amd64 },
-            new ProductImageData { Version = V6_0, OS = OS.Mariner10,    Arch = Arch.Amd64 },
-            new ProductImageData { Version = V6_0, OS = OS.BullseyeSlim, Arch = Arch.Arm },
-            new ProductImageData { Version = V6_0, OS = OS.BullseyeSlim, Arch = Arch.Arm64 },
-            new ProductImageData { Version = V6_0, OS = OS.Focal,        Arch = Arch.Arm },
-            new ProductImageData { Version = V6_0, OS = OS.Focal,        Arch = Arch.Arm64 },
-            new ProductImageData { Version = V6_0, OS = OS.Alpine313,    Arch = Arch.Arm },
-            new ProductImageData { Version = V6_0, OS = OS.Alpine313,    Arch = Arch.Arm64 },
+            new ProductImageData { Version = V6_0, OS = OS.BullseyeSlim,        Arch = Arch.Amd64 },
+            new ProductImageData { Version = V6_0, OS = OS.BookwormSlim,        Arch = Arch.Amd64 },
+            new ProductImageData { Version = V6_0, OS = OS.Focal,               Arch = Arch.Amd64 },
+            new ProductImageData { Version = V6_0, OS = OS.Jammy,               Arch = Arch.Amd64 },
+            new ProductImageData { Version = V6_0, OS = OS.JammyChiseled,       Arch = Arch.Amd64,   SdkOS = OS.Jammy },
+            new ProductImageData { Version = V6_0, OS = OS.JammyChiseled,       Arch = Arch.Amd64,   SdkOS = OS.Jammy,
+                    ImageVariant = DotNetImageVariant.Extra, SupportedImageRepos = DotNetImageRepo.Runtime_Deps | DotNetImageRepo.Runtime | DotNetImageRepo.Aspnet },
+            new ProductImageData { Version = V6_0, OS = OS.Alpine318,           Arch = Arch.Amd64 },
+            new ProductImageData { Version = V6_0, OS = OS.Alpine319,           Arch = Arch.Amd64 },
+            new ProductImageData { Version = V6_0, OS = OS.Mariner20,           Arch = Arch.Amd64 },
+            new ProductImageData { Version = V6_0, OS = OS.Mariner20Distroless, Arch = Arch.Amd64,   SdkOS = OS.Mariner20 },
+
+            new ProductImageData { Version = V6_0, OS = OS.Mariner20,           Arch = Arch.Arm64 },
+            new ProductImageData { Version = V6_0, OS = OS.Mariner20Distroless, Arch = Arch.Arm64,   SdkOS = OS.Mariner20 },
+            new ProductImageData { Version = V6_0, OS = OS.BullseyeSlim,        Arch = Arch.Arm64 },
+            new ProductImageData { Version = V6_0, OS = OS.BookwormSlim,        Arch = Arch.Arm64 },
+            new ProductImageData { Version = V6_0, OS = OS.Focal,               Arch = Arch.Arm64 },
+            new ProductImageData { Version = V6_0, OS = OS.Jammy,               Arch = Arch.Arm64 },
+            new ProductImageData { Version = V6_0, OS = OS.JammyChiseled,       Arch = Arch.Arm64,   SdkOS = OS.Jammy },
+            new ProductImageData { Version = V6_0, OS = OS.JammyChiseled,       Arch = Arch.Arm64,   SdkOS = OS.Jammy,
+                    ImageVariant = DotNetImageVariant.Extra, SupportedImageRepos = DotNetImageRepo.Runtime_Deps | DotNetImageRepo.Runtime | DotNetImageRepo.Aspnet },
+            new ProductImageData { Version = V6_0, OS = OS.Alpine318,           Arch = Arch.Arm64 },
+            new ProductImageData { Version = V6_0, OS = OS.Alpine319,           Arch = Arch.Arm64 },
+
+            new ProductImageData { Version = V6_0, OS = OS.BullseyeSlim,        Arch = Arch.Arm },
+            new ProductImageData { Version = V6_0, OS = OS.BookwormSlim,        Arch = Arch.Arm },
+            new ProductImageData { Version = V6_0, OS = OS.Focal,               Arch = Arch.Arm },
+            new ProductImageData { Version = V6_0, OS = OS.Jammy,               Arch = Arch.Arm },
+            new ProductImageData { Version = V6_0, OS = OS.JammyChiseled,       Arch = Arch.Arm,     SdkOS = OS.Jammy },
+            new ProductImageData { Version = V6_0, OS = OS.JammyChiseled,       Arch = Arch.Arm,     SdkOS = OS.Jammy,
+                    ImageVariant = DotNetImageVariant.Extra, SupportedImageRepos = DotNetImageRepo.Runtime_Deps | DotNetImageRepo.Runtime | DotNetImageRepo.Aspnet },
+            new ProductImageData { Version = V6_0, OS = OS.Alpine318,           Arch = Arch.Arm },
+            new ProductImageData { Version = V6_0, OS = OS.Alpine319,           Arch = Arch.Arm },
+
+
+            new ProductImageData { Version = V7_0, OS = OS.BullseyeSlim,        Arch = Arch.Amd64 },
+            new ProductImageData { Version = V7_0, OS = OS.BookwormSlim,        Arch = Arch.Amd64 },
+            new ProductImageData { Version = V7_0, OS = OS.Jammy,               Arch = Arch.Amd64 },
+            new ProductImageData { Version = V7_0, OS = OS.JammyChiseled,       Arch = Arch.Amd64,   SdkOS = OS.Jammy },
+            new ProductImageData { Version = V7_0, OS = OS.JammyChiseled,       Arch = Arch.Amd64,     SdkOS = OS.Jammy,
+                    ImageVariant = DotNetImageVariant.Extra, SupportedImageRepos = DotNetImageRepo.Runtime_Deps | DotNetImageRepo.Runtime | DotNetImageRepo.Aspnet },
+            new ProductImageData { Version = V7_0, OS = OS.Alpine318,           Arch = Arch.Amd64 },
+            new ProductImageData { Version = V7_0, OS = OS.Alpine319,           Arch = Arch.Amd64 },
+            new ProductImageData { Version = V7_0, OS = OS.Mariner20,           Arch = Arch.Amd64 },
+            new ProductImageData { Version = V7_0, OS = OS.Mariner20Distroless, Arch = Arch.Amd64,   SdkOS = OS.Mariner20 },
+
+            new ProductImageData { Version = V7_0, OS = OS.Mariner20,           Arch = Arch.Arm64 },
+            new ProductImageData { Version = V7_0, OS = OS.Mariner20Distroless, Arch = Arch.Arm64,   SdkOS = OS.Mariner20 },
+            new ProductImageData { Version = V7_0, OS = OS.BullseyeSlim,        Arch = Arch.Arm64 },
+            new ProductImageData { Version = V7_0, OS = OS.BookwormSlim,        Arch = Arch.Arm64 },
+            new ProductImageData { Version = V7_0, OS = OS.Jammy,               Arch = Arch.Arm64 },
+            new ProductImageData { Version = V7_0, OS = OS.JammyChiseled,       Arch = Arch.Arm64,   SdkOS = OS.Jammy },
+            new ProductImageData { Version = V7_0, OS = OS.JammyChiseled,       Arch = Arch.Arm64,     SdkOS = OS.Jammy,
+                    ImageVariant = DotNetImageVariant.Extra, SupportedImageRepos = DotNetImageRepo.Runtime_Deps | DotNetImageRepo.Runtime | DotNetImageRepo.Aspnet },
+            new ProductImageData { Version = V7_0, OS = OS.Alpine318,           Arch = Arch.Arm64 },
+            new ProductImageData { Version = V7_0, OS = OS.Alpine319,           Arch = Arch.Arm64 },
+
+            new ProductImageData { Version = V7_0, OS = OS.BullseyeSlim,        Arch = Arch.Arm },
+            new ProductImageData { Version = V7_0, OS = OS.BookwormSlim,        Arch = Arch.Arm },
+            new ProductImageData { Version = V7_0, OS = OS.Jammy,               Arch = Arch.Arm },
+            new ProductImageData { Version = V7_0, OS = OS.JammyChiseled,       Arch = Arch.Arm,     SdkOS = OS.Jammy },
+            new ProductImageData { Version = V7_0, OS = OS.JammyChiseled,       Arch = Arch.Arm,     SdkOS = OS.Jammy,
+                    ImageVariant = DotNetImageVariant.Extra, SupportedImageRepos = DotNetImageRepo.Runtime_Deps | DotNetImageRepo.Runtime | DotNetImageRepo.Aspnet },
+            new ProductImageData { Version = V7_0, OS = OS.Alpine318,           Arch = Arch.Arm },
+            new ProductImageData { Version = V7_0, OS = OS.Alpine319,           Arch = Arch.Arm },
+
+
+            new ProductImageData { Version = V8_0, OS = OS.BookwormSlim,        Arch = Arch.Amd64 },
+            new ProductImageData { Version = V8_0, OS = OS.Jammy,               Arch = Arch.Amd64 },
+            new ProductImageData { Version = V8_0, OS = OS.JammyChiseled,       Arch = Arch.Amd64,   SdkOS = OS.Jammy },
+            new ProductImageData { Version = V8_0, OS = OS.JammyChiseled,       Arch = Arch.Amd64,   SdkOS = OS.Jammy },
+            new ProductImageData { Version = V8_0, OS = OS.JammyChiseled,       Arch = Arch.Amd64,   SdkOS = OS.Jammy,
+                    ImageVariant = DotNetImageVariant.Composite, SupportedImageRepos = DotNetImageRepo.Aspnet },
+            new ProductImageData { Version = V8_0, OS = OS.JammyChiseled,       Arch = Arch.Amd64,   SdkOS = OS.Jammy,
+                    ImageVariant = DotNetImageVariant.Composite | DotNetImageVariant.Extra, SupportedImageRepos = DotNetImageRepo.Aspnet },
+            new ProductImageData { Version = V8_0, OS = OS.JammyChiseled,       Arch = Arch.Amd64,   SdkOS = OS.Jammy,
+                    ImageVariant = DotNetImageVariant.Extra, SupportedImageRepos = DotNetImageRepo.Runtime_Deps | DotNetImageRepo.Runtime | DotNetImageRepo.Aspnet },
+            new ProductImageData { Version = V8_0, OS = OS.Alpine318,           Arch = Arch.Amd64 },
+            new ProductImageData { Version = V8_0, OS = OS.Alpine318,           Arch = Arch.Amd64,   SdkOS = OS.Alpine318,
+                    ImageVariant = DotNetImageVariant.Composite, SupportedImageRepos = DotNetImageRepo.Aspnet },
+            new ProductImageData { Version = V8_0, OS = OS.Alpine318,           Arch = Arch.Amd64,   SdkOS = OS.Alpine318,
+                    ImageVariant = DotNetImageVariant.Extra, SupportedImageRepos = DotNetImageRepo.Runtime_Deps },
+            new ProductImageData { Version = V8_0, OS = OS.Alpine319,           Arch = Arch.Amd64 },
+            new ProductImageData { Version = V8_0, OS = OS.Alpine319,           Arch = Arch.Amd64,   SdkOS = OS.Alpine319,
+                    ImageVariant = DotNetImageVariant.Composite, SupportedImageRepos = DotNetImageRepo.Aspnet },
+            new ProductImageData { Version = V8_0, OS = OS.Alpine319,           Arch = Arch.Amd64,   SdkOS = OS.Alpine319,
+                    ImageVariant = DotNetImageVariant.Extra, SupportedImageRepos = DotNetImageRepo.Runtime_Deps },
+            new ProductImageData { Version = V8_0, OS = OS.Mariner20,           Arch = Arch.Amd64 },
+            new ProductImageData { Version = V8_0, OS = OS.Mariner20Distroless, Arch = Arch.Amd64,   SdkOS = OS.Mariner20 },
+            new ProductImageData { Version = V8_0, OS = OS.Mariner20Distroless, Arch = Arch.Amd64,   SdkOS = OS.Mariner20,
+                    ImageVariant = DotNetImageVariant.Extra, SupportedImageRepos = DotNetImageRepo.Runtime_Deps | DotNetImageRepo.Runtime | DotNetImageRepo.Aspnet },
+            new ProductImageData { Version = V8_0, OS = OS.Mariner20Distroless, Arch = Arch.Amd64,   SdkOS = OS.Mariner20,
+                    ImageVariant = DotNetImageVariant.Composite, SupportedImageRepos = DotNetImageRepo.Aspnet },
+            new ProductImageData { Version = V8_0, OS = OS.Mariner20Distroless, Arch = Arch.Amd64,   SdkOS = OS.Mariner20,
+                    ImageVariant = DotNetImageVariant.Composite | DotNetImageVariant.Extra, SupportedImageRepos = DotNetImageRepo.Aspnet },
+
+            new ProductImageData { Version = V8_0, OS = OS.Mariner20,           Arch = Arch.Arm64 },
+            new ProductImageData { Version = V8_0, OS = OS.Mariner20Distroless, Arch = Arch.Arm64,   SdkOS = OS.Mariner20 },
+            new ProductImageData { Version = V8_0, OS = OS.Mariner20Distroless, Arch = Arch.Arm64,   SdkOS = OS.Mariner20,
+                    ImageVariant = DotNetImageVariant.Extra, SupportedImageRepos = DotNetImageRepo.Runtime_Deps | DotNetImageRepo.Runtime | DotNetImageRepo.Aspnet },
+            new ProductImageData { Version = V8_0, OS = OS.Mariner20Distroless, Arch = Arch.Arm64,   SdkOS = OS.Mariner20,
+                    ImageVariant = DotNetImageVariant.Composite, SupportedImageRepos = DotNetImageRepo.Aspnet },
+            new ProductImageData { Version = V8_0, OS = OS.Mariner20Distroless, Arch = Arch.Arm64,   SdkOS = OS.Mariner20,
+                    ImageVariant = DotNetImageVariant.Composite | DotNetImageVariant.Extra, SupportedImageRepos = DotNetImageRepo.Aspnet },
+            new ProductImageData { Version = V8_0, OS = OS.BookwormSlim,        Arch = Arch.Arm64 },
+            new ProductImageData { Version = V8_0, OS = OS.Jammy,               Arch = Arch.Arm64 },
+            new ProductImageData { Version = V8_0, OS = OS.JammyChiseled,       Arch = Arch.Arm64,   SdkOS = OS.Jammy },
+            new ProductImageData { Version = V8_0, OS = OS.JammyChiseled,       Arch = Arch.Arm64,   SdkOS = OS.Jammy,
+                    ImageVariant = DotNetImageVariant.Composite, SupportedImageRepos = DotNetImageRepo.Aspnet },
+            new ProductImageData { Version = V8_0, OS = OS.JammyChiseled,       Arch = Arch.Arm64,   SdkOS = OS.Jammy,
+                    ImageVariant = DotNetImageVariant.Composite | DotNetImageVariant.Extra, SupportedImageRepos = DotNetImageRepo.Aspnet },
+            new ProductImageData { Version = V8_0, OS = OS.JammyChiseled,       Arch = Arch.Arm64,   SdkOS = OS.Jammy,
+                    ImageVariant = DotNetImageVariant.Extra, SupportedImageRepos = DotNetImageRepo.Runtime_Deps | DotNetImageRepo.Runtime | DotNetImageRepo.Aspnet },
+            new ProductImageData { Version = V8_0, OS = OS.Alpine318,           Arch = Arch.Arm64 },
+            new ProductImageData { Version = V8_0, OS = OS.Alpine318,           Arch = Arch.Arm64,   SdkOS = OS.Alpine318,
+                    ImageVariant = DotNetImageVariant.Composite, SupportedImageRepos = DotNetImageRepo.Aspnet },
+            new ProductImageData { Version = V8_0, OS = OS.Alpine318,           Arch = Arch.Arm64,   SdkOS = OS.Alpine318,
+                    ImageVariant = DotNetImageVariant.Extra, SupportedImageRepos = DotNetImageRepo.Runtime_Deps },
+            new ProductImageData { Version = V8_0, OS = OS.Alpine319,           Arch = Arch.Arm64 },
+            new ProductImageData { Version = V8_0, OS = OS.Alpine319,           Arch = Arch.Arm64,   SdkOS = OS.Alpine319,
+                    ImageVariant = DotNetImageVariant.Composite, SupportedImageRepos = DotNetImageRepo.Aspnet },
+            new ProductImageData { Version = V8_0, OS = OS.Alpine319,           Arch = Arch.Arm64,   SdkOS = OS.Alpine319,
+                    ImageVariant = DotNetImageVariant.Extra, SupportedImageRepos = DotNetImageRepo.Runtime_Deps },
+
+            new ProductImageData { Version = V8_0, OS = OS.BookwormSlim,        Arch = Arch.Arm },
+            new ProductImageData { Version = V8_0, OS = OS.Jammy,               Arch = Arch.Arm },
+            new ProductImageData { Version = V8_0, OS = OS.JammyChiseled,       Arch = Arch.Arm,     SdkOS = OS.Jammy },
+            new ProductImageData { Version = V8_0, OS = OS.JammyChiseled,       Arch = Arch.Arm,     SdkOS = OS.Jammy,
+                    ImageVariant = DotNetImageVariant.Composite, SupportedImageRepos = DotNetImageRepo.Aspnet },
+            new ProductImageData { Version = V8_0, OS = OS.JammyChiseled,       Arch = Arch.Arm,     SdkOS = OS.Jammy,
+                    ImageVariant = DotNetImageVariant.Composite | DotNetImageVariant.Extra, SupportedImageRepos = DotNetImageRepo.Aspnet },
+            new ProductImageData { Version = V8_0, OS = OS.JammyChiseled,       Arch = Arch.Arm,     SdkOS = OS.Jammy,
+                    ImageVariant = DotNetImageVariant.Extra, SupportedImageRepos = DotNetImageRepo.Runtime_Deps | DotNetImageRepo.Runtime | DotNetImageRepo.Aspnet },
+            new ProductImageData { Version = V8_0, OS = OS.Alpine318,           Arch = Arch.Arm },
+            new ProductImageData { Version = V8_0, OS = OS.Alpine318,           Arch = Arch.Arm,     SdkOS = OS.Alpine318,
+                    ImageVariant = DotNetImageVariant.Composite, SupportedImageRepos = DotNetImageRepo.Aspnet },
+            new ProductImageData { Version = V8_0, OS = OS.Alpine318,           Arch = Arch.Arm,     SdkOS = OS.Alpine318,
+                    ImageVariant = DotNetImageVariant.Extra, SupportedImageRepos = DotNetImageRepo.Runtime_Deps },
+            new ProductImageData { Version = V8_0, OS = OS.Alpine319,           Arch = Arch.Arm },
+            new ProductImageData { Version = V8_0, OS = OS.Alpine319,           Arch = Arch.Arm,     SdkOS = OS.Alpine319,
+                    ImageVariant = DotNetImageVariant.Composite, SupportedImageRepos = DotNetImageRepo.Aspnet },
+            new ProductImageData { Version = V8_0, OS = OS.Alpine319,           Arch = Arch.Arm,     SdkOS = OS.Alpine319,
+                    ImageVariant = DotNetImageVariant.Extra, SupportedImageRepos = DotNetImageRepo.Runtime_Deps },
+
+            new ProductImageData { Version = V9_0, OS = OS.BookwormSlim,        Arch = Arch.Amd64 },
+            new ProductImageData { Version = V9_0, OS = OS.Jammy,               Arch = Arch.Amd64 },
+            new ProductImageData { Version = V9_0, OS = OS.JammyChiseled,       Arch = Arch.Amd64,   SdkOS = OS.Jammy },
+            new ProductImageData { Version = V9_0, OS = OS.JammyChiseled,       Arch = Arch.Amd64,   SdkOS = OS.Jammy },
+            new ProductImageData { Version = V9_0, OS = OS.JammyChiseled,       Arch = Arch.Amd64,   SdkOS = OS.Jammy,
+                    ImageVariant = DotNetImageVariant.Composite, SupportedImageRepos = DotNetImageRepo.Aspnet },
+            new ProductImageData { Version = V9_0, OS = OS.JammyChiseled,       Arch = Arch.Amd64,   SdkOS = OS.Jammy,
+                    ImageVariant = DotNetImageVariant.Extra, SupportedImageRepos = DotNetImageRepo.Runtime_Deps },
+            new ProductImageData { Version = V9_0, OS = OS.Alpine319,           Arch = Arch.Amd64 },
+            new ProductImageData { Version = V9_0, OS = OS.Alpine319,           Arch = Arch.Amd64,   SdkOS = OS.Alpine318,
+                    ImageVariant = DotNetImageVariant.Composite, SupportedImageRepos = DotNetImageRepo.Aspnet },
+            new ProductImageData { Version = V9_0, OS = OS.Alpine319,           Arch = Arch.Amd64,   SdkOS = OS.Alpine318,
+                    ImageVariant = DotNetImageVariant.Extra, SupportedImageRepos = DotNetImageRepo.Runtime_Deps },
+            new ProductImageData { Version = V9_0, OS = OS.Mariner20,           Arch = Arch.Amd64 },
+            new ProductImageData { Version = V9_0, OS = OS.Mariner20Distroless, Arch = Arch.Amd64,   SdkOS = OS.Mariner20 },
+            new ProductImageData { Version = V9_0, OS = OS.Mariner20Distroless, Arch = Arch.Amd64,   SdkOS = OS.Mariner20,
+                    ImageVariant = DotNetImageVariant.Extra, SupportedImageRepos = DotNetImageRepo.Runtime_Deps | DotNetImageRepo.Runtime | DotNetImageRepo.Aspnet },
+            new ProductImageData { Version = V9_0, OS = OS.Mariner20Distroless, Arch = Arch.Amd64,   SdkOS = OS.Mariner20,
+                    ImageVariant = DotNetImageVariant.Composite, SupportedImageRepos = DotNetImageRepo.Aspnet },
+            new ProductImageData { Version = V9_0, OS = OS.Mariner20Distroless, Arch = Arch.Amd64,   SdkOS = OS.Mariner20,
+                    ImageVariant = DotNetImageVariant.Composite | DotNetImageVariant.Extra, SupportedImageRepos = DotNetImageRepo.Aspnet },
+
+            new ProductImageData { Version = V9_0, OS = OS.Mariner20,           Arch = Arch.Arm64 },
+            new ProductImageData { Version = V9_0, OS = OS.Mariner20Distroless, Arch = Arch.Arm64,   SdkOS = OS.Mariner20 },
+            new ProductImageData { Version = V9_0, OS = OS.Mariner20Distroless, Arch = Arch.Arm64,   SdkOS = OS.Mariner20,
+                    ImageVariant = DotNetImageVariant.Extra, SupportedImageRepos = DotNetImageRepo.Runtime_Deps | DotNetImageRepo.Runtime | DotNetImageRepo.Aspnet },
+            new ProductImageData { Version = V9_0, OS = OS.Mariner20Distroless, Arch = Arch.Arm64,   SdkOS = OS.Mariner20,
+                    ImageVariant = DotNetImageVariant.Composite, SupportedImageRepos = DotNetImageRepo.Aspnet },
+            new ProductImageData { Version = V9_0, OS = OS.Mariner20Distroless, Arch = Arch.Arm64,   SdkOS = OS.Mariner20,
+                    ImageVariant = DotNetImageVariant.Composite | DotNetImageVariant.Extra, SupportedImageRepos = DotNetImageRepo.Aspnet },
+            new ProductImageData { Version = V9_0, OS = OS.BookwormSlim,        Arch = Arch.Arm64 },
+            new ProductImageData { Version = V9_0, OS = OS.Jammy,               Arch = Arch.Arm64 },
+            new ProductImageData { Version = V9_0, OS = OS.JammyChiseled,       Arch = Arch.Arm64,   SdkOS = OS.Jammy },
+            new ProductImageData { Version = V9_0, OS = OS.JammyChiseled,       Arch = Arch.Arm64,   SdkOS = OS.Jammy,
+                    ImageVariant = DotNetImageVariant.Composite, SupportedImageRepos = DotNetImageRepo.Aspnet },
+            new ProductImageData { Version = V9_0, OS = OS.JammyChiseled,       Arch = Arch.Arm64,   SdkOS = OS.Jammy,
+                    ImageVariant = DotNetImageVariant.Extra, SupportedImageRepos = DotNetImageRepo.Runtime_Deps },
+            new ProductImageData { Version = V9_0, OS = OS.Alpine319,           Arch = Arch.Arm64 },
+            new ProductImageData { Version = V9_0, OS = OS.Alpine319,           Arch = Arch.Arm64,   SdkOS = OS.Alpine318,
+                    ImageVariant = DotNetImageVariant.Composite, SupportedImageRepos = DotNetImageRepo.Aspnet },
+            new ProductImageData { Version = V9_0, OS = OS.Alpine319,           Arch = Arch.Arm64,   SdkOS = OS.Alpine318,
+                    ImageVariant = DotNetImageVariant.Extra, SupportedImageRepos = DotNetImageRepo.Runtime_Deps },
+
+            new ProductImageData { Version = V9_0, OS = OS.BookwormSlim,        Arch = Arch.Arm },
+            new ProductImageData { Version = V9_0, OS = OS.Jammy,               Arch = Arch.Arm },
+            new ProductImageData { Version = V9_0, OS = OS.JammyChiseled,       Arch = Arch.Arm,     SdkOS = OS.Jammy },
+            new ProductImageData { Version = V9_0, OS = OS.JammyChiseled,       Arch = Arch.Arm,     SdkOS = OS.Jammy,
+                    ImageVariant = DotNetImageVariant.Composite, SupportedImageRepos = DotNetImageRepo.Aspnet },
+            new ProductImageData { Version = V9_0, OS = OS.JammyChiseled,       Arch = Arch.Arm,     SdkOS = OS.Jammy,
+                    ImageVariant = DotNetImageVariant.Composite | DotNetImageVariant.Extra, SupportedImageRepos = DotNetImageRepo.Aspnet },
+            new ProductImageData { Version = V9_0, OS = OS.JammyChiseled,       Arch = Arch.Arm,     SdkOS = OS.Jammy,
+                    ImageVariant = DotNetImageVariant.Extra, SupportedImageRepos = DotNetImageRepo.Runtime_Deps | DotNetImageRepo.Runtime | DotNetImageRepo.Aspnet },
+            new ProductImageData { Version = V9_0, OS = OS.JammyChiseled,       Arch = Arch.Arm,     SdkOS = OS.Jammy, SdkImageVariant = DotNetImageVariant.AOT,
+                    ImageVariant = DotNetImageVariant.AOT, SupportedImageRepos = DotNetImageRepo.Runtime_Deps }
+            // Disabled due to https://github.com/dotnet/runtime/issues/100536. Re-enable when fixed.
+            // new ProductImageData { Version = V9_0, OS = OS.Alpine319,           Arch = Arch.Arm },
+            // new ProductImageData { Version = V9_0, OS = OS.Alpine319,           Arch = Arch.Arm,     SdkOS = OS.Alpine319,
+            //         ImageVariant = DotNetImageVariant.Composite, SupportedImageRepos = DotNetImageRepo.Aspnet },
+            // new ProductImageData { Version = V9_0, OS = OS.Alpine319,           Arch = Arch.Arm,     SdkOS = OS.Alpine319,
+            //         ImageVariant = DotNetImageVariant.Extra, SupportedImageRepos = DotNetImageRepo.Runtime_Deps },
         };
+
         private static readonly ProductImageData[] s_windowsTestData =
         {
-            new ProductImageData { Version = V2_1, OS = OS.NanoServer1809,     Arch = Arch.Amd64 },
-            new ProductImageData { Version = V2_1, OS = OS.NanoServer2004,     Arch = Arch.Amd64 },
-            new ProductImageData { Version = V2_1, OS = OS.NanoServer20H2,     Arch = Arch.Amd64 },
-            new ProductImageData { Version = V3_1, OS = OS.NanoServer1809,     Arch = Arch.Amd64 },
-            new ProductImageData { Version = V3_1, OS = OS.NanoServer2004,     Arch = Arch.Amd64 },
-            new ProductImageData { Version = V3_1, OS = OS.NanoServer20H2,     Arch = Arch.Amd64 },
-            new ProductImageData { Version = V5_0, OS = OS.NanoServer1809,     Arch = Arch.Amd64 },
-            new ProductImageData { Version = V5_0, OS = OS.NanoServer2004,     Arch = Arch.Amd64 },
-            new ProductImageData { Version = V5_0, OS = OS.NanoServer20H2,     Arch = Arch.Amd64 },
-            new ProductImageData { Version = V5_0, OS = OS.ServerCoreLtsc2019, Arch = Arch.Amd64 },
             new ProductImageData { Version = V6_0, OS = OS.NanoServer1809,     Arch = Arch.Amd64 },
-            new ProductImageData { Version = V6_0, OS = OS.NanoServer2004,     Arch = Arch.Amd64 },
-            new ProductImageData { Version = V6_0, OS = OS.NanoServer20H2,     Arch = Arch.Amd64 },
+            new ProductImageData { Version = V6_0, OS = OS.NanoServerLtsc2022, Arch = Arch.Amd64 },
             new ProductImageData { Version = V6_0, OS = OS.ServerCoreLtsc2019, Arch = Arch.Amd64 },
+            new ProductImageData { Version = V6_0, OS = OS.ServerCoreLtsc2022, Arch = Arch.Amd64 },
+            new ProductImageData { Version = V7_0, OS = OS.NanoServer1809,     Arch = Arch.Amd64 },
+            new ProductImageData { Version = V7_0, OS = OS.NanoServerLtsc2022, Arch = Arch.Amd64 },
+            new ProductImageData { Version = V7_0, OS = OS.ServerCoreLtsc2019, Arch = Arch.Amd64 },
+            new ProductImageData { Version = V7_0, OS = OS.ServerCoreLtsc2022, Arch = Arch.Amd64 },
+            new ProductImageData { Version = V8_0, OS = OS.NanoServer1809,     Arch = Arch.Amd64 },
+            new ProductImageData { Version = V8_0, OS = OS.NanoServerLtsc2022, Arch = Arch.Amd64 },
+            new ProductImageData { Version = V8_0, OS = OS.ServerCoreLtsc2019, Arch = Arch.Amd64 },
+            new ProductImageData { Version = V8_0, OS = OS.ServerCoreLtsc2022, Arch = Arch.Amd64 },
+            new ProductImageData { Version = V9_0, OS = OS.NanoServer1809,     Arch = Arch.Amd64 },
+            new ProductImageData { Version = V9_0, OS = OS.NanoServerLtsc2022, Arch = Arch.Amd64 },
+            new ProductImageData { Version = V9_0, OS = OS.ServerCoreLtsc2019, Arch = Arch.Amd64 },
+            new ProductImageData { Version = V9_0, OS = OS.ServerCoreLtsc2022, Arch = Arch.Amd64 },
         };
-        
+
         private static readonly SampleImageData[] s_linuxSampleTestData =
         {
-            new SampleImageData { OS = OS.BusterSlim, Arch = Arch.Amd64, IsPublished = true },
-            new SampleImageData { OS = OS.BusterSlim, Arch = Arch.Arm,   IsPublished = true },
-            new SampleImageData { OS = OS.BusterSlim, Arch = Arch.Arm64, IsPublished = true },
+            new SampleImageData { OS = OS.Alpine,           Arch = Arch.Amd64, DockerfileSuffix = "alpine",   IsPublished = true },
+            new SampleImageData { OS = OS.Alpine,           Arch = Arch.Arm,   DockerfileSuffix = "alpine",   IsPublished = true },
+            new SampleImageData { OS = OS.Alpine,           Arch = Arch.Arm64, DockerfileSuffix = "alpine",   IsPublished = true },
+            new SampleImageData { OS = OS.JammyChiseled,    Arch = Arch.Arm,   DockerfileSuffix = "chiseled", IsPublished = true },
+            new SampleImageData { OS = OS.JammyChiseled,    Arch = Arch.Arm64, DockerfileSuffix = "chiseled", IsPublished = true },
+            new SampleImageData { OS = OS.JammyChiseled,    Arch = Arch.Amd64, DockerfileSuffix = "chiseled", IsPublished = true },
 
-            new SampleImageData { OS = OS.Alpine,     Arch = Arch.Arm64, DockerfileSuffix = "alpine-arm64" },
-            new SampleImageData { OS = OS.Alpine,     Arch = Arch.Amd64, DockerfileSuffix = "alpine-x64" },
-            new SampleImageData { OS = OS.Alpine,     Arch = Arch.Amd64, DockerfileSuffix = "alpine-x64-slim" },
-            new SampleImageData { OS = OS.BusterSlim, Arch = Arch.Arm,   DockerfileSuffix = "debian-arm32" },
-            new SampleImageData { OS = OS.BusterSlim, Arch = Arch.Arm64, DockerfileSuffix = "debian-arm64" },
-            new SampleImageData { OS = OS.BusterSlim, Arch = Arch.Amd64, DockerfileSuffix = "debian-x64" },
-            new SampleImageData { OS = OS.BusterSlim, Arch = Arch.Amd64, DockerfileSuffix = "debian-x64-slim" },
-            new SampleImageData { OS = OS.Bionic,     Arch = Arch.Arm,   DockerfileSuffix = "ubuntu-arm32" },
-            new SampleImageData { OS = OS.Bionic,     Arch = Arch.Arm64, DockerfileSuffix = "ubuntu-arm64" },
-            new SampleImageData { OS = OS.Bionic,     Arch = Arch.Amd64, DockerfileSuffix = "ubuntu-x64" },
-            new SampleImageData { OS = OS.Bionic,     Arch = Arch.Amd64, DockerfileSuffix = "ubuntu-x64-slim" },
+            new SampleImageData { OS = OS.BookwormSlim,     Arch = Arch.Amd64 },
+            new SampleImageData { OS = OS.BookwormSlim,     Arch = Arch.Arm },
+            new SampleImageData { OS = OS.BookwormSlim,     Arch = Arch.Arm64 },
+            new SampleImageData { OS = OS.Alpine,           Arch = Arch.Arm64, DockerfileSuffix = "alpine" },
+            new SampleImageData { OS = OS.Alpine,           Arch = Arch.Amd64, DockerfileSuffix = "alpine" },
+            new SampleImageData { OS = OS.Alpine,           Arch = Arch.Arm64, DockerfileSuffix = "alpine-icu" },
+            new SampleImageData { OS = OS.Alpine,           Arch = Arch.Amd64, DockerfileSuffix = "alpine-icu" },
+            new SampleImageData { OS = OS.BookwormSlim,     Arch = Arch.Arm,   DockerfileSuffix = "debian" },
+            new SampleImageData { OS = OS.BookwormSlim,     Arch = Arch.Arm64, DockerfileSuffix = "debian" },
+            new SampleImageData { OS = OS.BookwormSlim,     Arch = Arch.Amd64, DockerfileSuffix = "debian" },
+            new SampleImageData { OS = OS.Jammy,            Arch = Arch.Arm,   DockerfileSuffix = "ubuntu" },
+            new SampleImageData { OS = OS.Jammy,            Arch = Arch.Arm64, DockerfileSuffix = "ubuntu" },
+            new SampleImageData { OS = OS.Jammy,            Arch = Arch.Amd64, DockerfileSuffix = "ubuntu" },
+            new SampleImageData { OS = OS.JammyChiseled,    Arch = Arch.Arm,   DockerfileSuffix = "chiseled" },
+            new SampleImageData { OS = OS.JammyChiseled,    Arch = Arch.Arm64, DockerfileSuffix = "chiseled" },
+            new SampleImageData { OS = OS.JammyChiseled,    Arch = Arch.Amd64, DockerfileSuffix = "chiseled" },
         };
 
         private static readonly SampleImageData[] s_windowsSampleTestData =
         {
-            new SampleImageData { OS = OS.NanoServer1809, Arch = Arch.Amd64, IsPublished = true },
-            new SampleImageData { OS = OS.NanoServer2004, Arch = Arch.Amd64, IsPublished = true },
-            new SampleImageData { OS = OS.NanoServer20H2, Arch = Arch.Amd64, IsPublished = true },
+            new SampleImageData { OS = OS.NanoServer1809,     Arch = Arch.Amd64, IsPublished = true },
+            new SampleImageData { OS = OS.NanoServerLtsc2022, Arch = Arch.Amd64, IsPublished = true },
 
-            new SampleImageData { OS = OS.NanoServer20H2, Arch = Arch.Amd64, DockerfileSuffix = "nanoserver-x64" },
-            new SampleImageData { OS = OS.NanoServer20H2, Arch = Arch.Amd64, DockerfileSuffix = "nanoserver-x64-slim" },
+            new SampleImageData { OS = OS.NanoServerLtsc2022, Arch = Arch.Amd64, DockerfileSuffix = "nanoserver" },
 
             // Use Nano Server as the OS even though the Dockerfiles are for Windows Server Core. This is because the OS value
             // needs to match the filter set by the build/test job. We only produce builds jobs based on what's in the manifest
             // and the manifest only defines Nano Server-based Dockerfiles. So we just need to piggyback on the Nano Server
             // jobs in order to test the Windows Server Core samples.
-            new SampleImageData { OS = OS.NanoServer1809, Arch = Arch.Amd64, DockerfileSuffix = "windowsservercore-x64" },
-            new SampleImageData { OS = OS.NanoServer1809, Arch = Arch.Amd64, DockerfileSuffix = "windowsservercore-iis-x64" },
-
-            // Disabling the slim sample due to https://github.com/dotnet/dotnet-docker/issues/2938
-            //new SampleImageData { OS = OS.NanoServer1809, Arch = Arch.Amd64, DockerfileSuffix = "windowsservercore-x64-slim" },
+            new SampleImageData { OS = OS.NanoServerLtsc2022, Arch = Arch.Amd64, DockerfileSuffix = "windowsservercore" },
+            new SampleImageData { OS = OS.NanoServerLtsc2022, Arch = Arch.Amd64, DockerfileSuffix = "windowsservercore-iis" },
         };
 
-        private static readonly MonitorImageData[] s_linuxMonitorTestData =
+        private static readonly ProductImageData[] s_linuxMonitorTestData =
         {
-            new MonitorImageData { Version = V5_0, RuntimeVersion = V3_1, OS = OS.Alpine313, OSTag = OS.Alpine, Arch = Arch.Amd64 },
+            new ProductImageData { Version = V6_3, VersionFamily = V6_0, OS = OS.Alpine318,           OSTag = OS.Alpine,            Arch = Arch.Amd64,  SupportedImageRepos = DotNetImageRepo.Monitor },
+            new ProductImageData { Version = V6_3, VersionFamily = V6_0, OS = OS.Alpine318,           OSTag = OS.Alpine,            Arch = Arch.Arm64,  SupportedImageRepos = DotNetImageRepo.Monitor },
+            new ProductImageData { Version = V6_3, VersionFamily = V6_0, OS = OS.JammyChiseled,       OSTag = OS.UbuntuChiseled,    Arch = Arch.Amd64,  SupportedImageRepos = DotNetImageRepo.Monitor },
+            new ProductImageData { Version = V6_3, VersionFamily = V6_0, OS = OS.JammyChiseled,       OSTag = OS.UbuntuChiseled,    Arch = Arch.Arm64,  SupportedImageRepos = DotNetImageRepo.Monitor },
+            new ProductImageData { Version = V6_3, VersionFamily = V6_0, OS = OS.Mariner20,           OSTag = OS.Mariner,           Arch = Arch.Amd64,  SupportedImageRepos = DotNetImageRepo.Monitor },
+            new ProductImageData { Version = V6_3, VersionFamily = V6_0, OS = OS.Mariner20,           OSTag = OS.Mariner,           Arch = Arch.Arm64,  SupportedImageRepos = DotNetImageRepo.Monitor },
+            new ProductImageData { Version = V6_3, VersionFamily = V6_0, OS = OS.Mariner20Distroless, OSTag = OS.MarinerDistroless, Arch = Arch.Amd64,  SupportedImageRepos = DotNetImageRepo.Monitor },
+            new ProductImageData { Version = V6_3, VersionFamily = V6_0, OS = OS.Mariner20Distroless, OSTag = OS.MarinerDistroless, Arch = Arch.Arm64,  SupportedImageRepos = DotNetImageRepo.Monitor },
+            new ProductImageData { Version = V7_3, VersionFamily = V7_0, OS = OS.Alpine318,           OSTag = OS.Alpine,            Arch = Arch.Amd64,  SupportedImageRepos = DotNetImageRepo.Monitor },
+            new ProductImageData { Version = V7_3, VersionFamily = V7_0, OS = OS.Alpine318,           OSTag = OS.Alpine,            Arch = Arch.Arm64,  SupportedImageRepos = DotNetImageRepo.Monitor },
+            new ProductImageData { Version = V7_3, VersionFamily = V7_0, OS = OS.JammyChiseled,       OSTag = OS.UbuntuChiseled,    Arch = Arch.Amd64,  SupportedImageRepos = DotNetImageRepo.Monitor },
+            new ProductImageData { Version = V7_3, VersionFamily = V7_0, OS = OS.JammyChiseled,       OSTag = OS.UbuntuChiseled,    Arch = Arch.Arm64,  SupportedImageRepos = DotNetImageRepo.Monitor },
+            new ProductImageData { Version = V7_3, VersionFamily = V7_0, OS = OS.Mariner20,           OSTag = OS.Mariner,           Arch = Arch.Amd64,  SupportedImageRepos = DotNetImageRepo.Monitor },
+            new ProductImageData { Version = V7_3, VersionFamily = V7_0, OS = OS.Mariner20,           OSTag = OS.Mariner,           Arch = Arch.Arm64,  SupportedImageRepos = DotNetImageRepo.Monitor },
+            new ProductImageData { Version = V7_3, VersionFamily = V7_0, OS = OS.Mariner20Distroless, OSTag = OS.MarinerDistroless, Arch = Arch.Amd64,  SupportedImageRepos = DotNetImageRepo.Monitor },
+            new ProductImageData { Version = V7_3, VersionFamily = V7_0, OS = OS.Mariner20Distroless, OSTag = OS.MarinerDistroless, Arch = Arch.Arm64,  SupportedImageRepos = DotNetImageRepo.Monitor },
+            new ProductImageData { Version = V8_0, VersionFamily = V8_0, OS = OS.JammyChiseled,       OSTag = OS.UbuntuChiseled,    Arch = Arch.Amd64,  SupportedImageRepos = DotNetImageRepo.Monitor },
+            new ProductImageData { Version = V8_0, VersionFamily = V8_0, OS = OS.JammyChiseled,       OSTag = OS.UbuntuChiseled,    Arch = Arch.Arm64,  SupportedImageRepos = DotNetImageRepo.Monitor },
+            new ProductImageData { Version = V8_0, VersionFamily = V8_0, OS = OS.Mariner20Distroless, OSTag = OS.MarinerDistroless, Arch = Arch.Amd64,  SupportedImageRepos = DotNetImageRepo.Monitor },
+            new ProductImageData { Version = V8_0, VersionFamily = V8_0, OS = OS.Mariner20Distroless, OSTag = OS.MarinerDistroless, Arch = Arch.Arm64,  SupportedImageRepos = DotNetImageRepo.Monitor },
+            new ProductImageData { Version = V9_0, VersionFamily = V9_0, OS = OS.JammyChiseled,       OSTag = OS.UbuntuChiseled,    Arch = Arch.Amd64,  SupportedImageRepos = DotNetImageRepo.Monitor },
+            new ProductImageData { Version = V9_0, VersionFamily = V9_0, OS = OS.JammyChiseled,       OSTag = OS.UbuntuChiseled,    Arch = Arch.Arm64,  SupportedImageRepos = DotNetImageRepo.Monitor },
+            new ProductImageData { Version = V9_0, VersionFamily = V9_0, OS = OS.Mariner20Distroless, OSTag = OS.MarinerDistroless, Arch = Arch.Amd64,  SupportedImageRepos = DotNetImageRepo.Monitor },
+            new ProductImageData { Version = V9_0, VersionFamily = V9_0, OS = OS.Mariner20Distroless, OSTag = OS.MarinerDistroless, Arch = Arch.Arm64,  SupportedImageRepos = DotNetImageRepo.Monitor }
         };
 
-        private static readonly MonitorImageData[] s_windowsMonitorTestData =
+        private static readonly ProductImageData[] s_windowsMonitorTestData =
         {
         };
 
-        public static IEnumerable<ProductImageData> GetImageData()
+        private static readonly ProductImageData[] s_AspireDashboardTestData =
+        {
+            new() {
+                Version = V8_0_Preview,
+                OS = OS.Mariner20Distroless,
+                OSTag = "",
+                OSDir = OS.MarinerDistroless,
+                Arch = Arch.Amd64,
+                SupportedImageRepos = DotNetImageRepo.Aspire_Dashboard,
+            },
+            new() {
+                Version = V8_0_Preview,
+                OS = OS.Mariner20Distroless,
+                OSTag = "",
+                OSDir = OS.MarinerDistroless,
+                Arch = Arch.Arm64,
+                SupportedImageRepos = DotNetImageRepo.Aspire_Dashboard
+            },
+        };
+
+        public static IEnumerable<ProductImageData> GetImageData(DotNetImageRepo imageRepo)
         {
             return (DockerHelper.IsLinuxContainerModeEnabled ? s_linuxTestData : s_windowsTestData)
-                .FilterImagesByVersion()
+                .FilterImagesBySupportedRepo(imageRepo)
+                .FilterImagesByPath(imageRepo)
                 .FilterImagesByArch()
                 .FilterImagesByOs()
                 .Cast<ProductImageData>();
@@ -139,29 +355,27 @@ namespace Microsoft.DotNet.Docker.Tests
                 .Cast<SampleImageData>();
         }
 
-        public static IEnumerable<MonitorImageData> GetMonitorImageData()
+        public static IEnumerable<ProductImageData> GetAspireDashboardImageData()
         {
-            return (DockerHelper.IsLinuxContainerModeEnabled ? s_linuxMonitorTestData : s_windowsMonitorTestData)
-                .FilterMonitorImagesByRuntimeVersion()
+            if (!DockerHelper.IsLinuxContainerModeEnabled)
+            {
+                return [];
+            }
+
+            return s_AspireDashboardTestData
+                .FilterImagesByPath(DotNetImageRepo.Aspire_Dashboard)
                 .FilterImagesByArch()
                 .FilterImagesByOs()
-                .Cast<MonitorImageData>();
+                .Cast<ProductImageData>();
         }
 
-        public static IEnumerable<ImageData> FilterImagesByVersion(this IEnumerable<ProductImageData> imageData)
+        public static IEnumerable<ProductImageData> GetMonitorImageData()
         {
-            string versionFilterPattern = GetFilterRegexPattern("IMAGE_VERSION");
-            return imageData
-                .Where(imageData => versionFilterPattern == null
-                    || Regex.IsMatch(imageData.VersionString, versionFilterPattern, RegexOptions.IgnoreCase));
-        }
-
-        public static IEnumerable<ImageData> FilterMonitorImagesByRuntimeVersion(this IEnumerable<MonitorImageData> imageData)
-        {
-            string versionFilterPattern = GetFilterRegexPattern("IMAGE_VERSION");
-            return imageData
-                .Where(imageData => versionFilterPattern == null
-                    || Regex.IsMatch(imageData.RuntimeVersionString, versionFilterPattern, RegexOptions.IgnoreCase));
+            return (DockerHelper.IsLinuxContainerModeEnabled ? s_linuxMonitorTestData : s_windowsMonitorTestData)
+                .FilterImagesByPath(DotNetImageRepo.Monitor)
+                .FilterImagesByArch()
+                .FilterImagesByOs()
+                .Cast<ProductImageData>();
         }
 
         public static IEnumerable<ImageData> FilterImagesByArch(this IEnumerable<ImageData> imageData)
@@ -174,10 +388,28 @@ namespace Microsoft.DotNet.Docker.Tests
 
         public static IEnumerable<ImageData> FilterImagesByOs(this IEnumerable<ImageData> imageData)
         {
-            string osFilterPattern = GetFilterRegexPattern("IMAGE_OS");
+            IEnumerable<string> osFilterPatterns = Config.OsNames
+                .Select(osName => Config.GetFilterRegexPattern(osName));
+
             return imageData
-                .Where(imageData => osFilterPattern == null
-                    || Regex.IsMatch(imageData.OS, osFilterPattern, RegexOptions.IgnoreCase));
+                .Where(imageData => !osFilterPatterns.Any()
+                    || osFilterPatterns.Any(osFilterPattern => Regex.IsMatch(imageData.OS, osFilterPattern, RegexOptions.IgnoreCase)));
+        }
+
+        public static IEnumerable<ImageData> FilterImagesByPath(this IEnumerable<ProductImageData> imageData, DotNetImageRepo imageRepo)
+        {
+            IEnumerable<string> pathPatterns = Config.Paths
+                .Select(path => Config.GetFilterRegexPattern(path));
+
+            return imageData
+                .Where(imageData => !pathPatterns.Any()
+                    || pathPatterns.Any(pathPattern => Regex.IsMatch(imageData.GetDockerfilePath(imageRepo), pathPattern, RegexOptions.IgnoreCase)));
+        }
+
+        public static IEnumerable<ProductImageData> FilterImagesBySupportedRepo(this IEnumerable<ProductImageData> imageData, DotNetImageRepo imageRepo)
+        {
+            var images = imageData.Where(imageData => imageData.ImageRepoIsSupported(imageRepo));
+            return images;
         }
 
         private static string GetFilterRegexPattern(string filterEnvName)

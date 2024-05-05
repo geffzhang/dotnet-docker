@@ -8,30 +8,38 @@ namespace Microsoft.DotNet.Docker.Tests
     {
         // Alpine
         public const string Alpine = "alpine";
-        public const string Alpine313 = "alpine3.13";
+        public const string Alpine318 = $"{Alpine}3.18";
+        public const string Alpine319 = $"{Alpine}3.19";
 
         // Debian
-        public const string BullseyeSlim = "bullseye-slim";
-        public const string Buster = "buster";
-        public const string BusterSlim = "buster-slim";
-        public const string Stretch = "stretch";
-        public const string StretchSlim = "stretch-slim";
+        public const string Bookworm = "bookworm";
+        public const string BookwormSlim = $"{Bookworm}{SlimSuffix}";
+        public const string Bullseye = "bullseye";
+        public const string BullseyeSlim = $"{Bullseye}{SlimSuffix}";
 
         // Mariner
-        public const string Mariner10 = "cbl-mariner1.0";
+        public const string Mariner = "cbl-mariner";
+
+        public const string MarinerDistroless = $"{Mariner}-distroless";
+        public const string Mariner20 = $"{Mariner}2.0";
+        public const string Mariner20Distroless = $"{Mariner20}-distroless";
 
         // Ubuntu
         public const string Bionic = "bionic";
         public const string Focal = "focal";
+        public const string Jammy = "jammy";
+        public const string JammyChiseled = $"{Jammy}-chiseled";
+        public const string UbuntuChiseled = "ubuntu-chiseled";
 
         // Windows
-        public const string NanoServer1809 = "nanoserver-1809";
-        public const string NanoServer2004 = "nanoserver-2004";
-        public const string NanoServer20H2 = "nanoserver-20H2";
-        public const string ServerCoreLtsc2019 = "windowsservercore-ltsc2019";
+        public const string NanoServer = "nanoserver";
+        public const string NanoServer1809 = $"{NanoServer}-1809";
+        public const string NanoServerLtsc2022 = $"{NanoServer}-ltsc2022";
+        public const string ServerCore = "windowsservercore";
+        public const string ServerCoreLtsc2019 = $"{ServerCore}-ltsc2019";
+        public const string ServerCoreLtsc2022 = $"{ServerCore}-ltsc2022";
 
         // Helpers
-        public const string AlpinePrefix = "alpine";
         public const string SlimSuffix = "-slim";
     }
 }

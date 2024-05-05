@@ -4,10 +4,13 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Xunit;
@@ -16,7 +19,7 @@ using Xunit.Abstractions;
 namespace Microsoft.DotNet.Docker.Tests
 {
     [Trait("Category", "monitor")]
-    public class MonitorImageTests
+    public class MonitorImageTests : CommonRuntimeImageTests
     {
         private const int DefaultHttpPort = 80;
         private const int DefaultArtifactsPort = 52323;
@@ -31,26 +34,28 @@ namespace Microsoft.DotNet.Docker.Tests
         private const string File_DiagPort = Directory_Diag + "/port";
 
         /// <summary>
+        /// Command line that is the default command line presented in the image.
+        /// When specifying additional command arguments, these must be prepended to
+        /// maintain existing behavior.
+        /// </summary>
+        private const string Switch_DefaultImageCmd = "collect --urls https://+:52323 --metricUrls http://+:52325";
+
+        /// <summary>
         /// Command line switch to disable authentication. By default,
         /// dotnet-monitor requires authentication on the artifacts port.
         /// </summary>
         private const string Switch_NoAuthentication = "--no-auth";
 
         public MonitorImageTests(ITestOutputHelper outputHelper)
+            : base(outputHelper)
         {
-            OutputHelper = outputHelper;
-            DockerHelper = new DockerHelper(outputHelper);
         }
 
-        protected DockerHelper DockerHelper { get; }
+        protected override DotNetImageRepo ImageRepo => DotNetImageRepo.Monitor;
 
-        protected ITestOutputHelper OutputHelper { get; }
-
-        public static IEnumerable<object[]> GetImageData()
-        {
-            return TestData.GetMonitorImageData()
+        public static IEnumerable<object[]> GetMonitorImageData() =>
+            TestData.GetMonitorImageData()
                 .Select(imageData => new object[] { imageData });
-        }
 
         /// <summary>
         /// Gets each dotnet-monitor image paired with each sample aspnetcore image of the same architecture.
@@ -59,7 +64,7 @@ namespace Microsoft.DotNet.Docker.Tests
         public static IEnumerable<object[]> GetScenarioData()
         {
             IList<object[]> data = new List<object[]>();
-            foreach (MonitorImageData monitorImageData in TestData.GetMonitorImageData())
+            foreach (ProductImageData ProductImageData in TestData.GetMonitorImageData())
             {
                 foreach (SampleImageData sampleImageData in TestData.GetAllSampleImageData())
                 {
@@ -68,32 +73,71 @@ namespace Microsoft.DotNet.Docker.Tests
                         continue;
 
                     // Only consider the sample image if it has the same architecture.
-                    if (monitorImageData.Arch != sampleImageData.Arch)
+                    if (ProductImageData.Arch != sampleImageData.Arch)
                         continue;
 
-                    data.Add(new object[] { monitorImageData, sampleImageData });
+                    data.Add(new object[] { ProductImageData, sampleImageData });
                 }
             }
             return data;
+        }
+
+        [LinuxImageTheory]
+        [MemberData(nameof(GetMonitorImageData))]
+        public void VerifyInsecureFiles(ProductImageData imageData)
+        {
+            base.VerifyCommonInsecureFiles(imageData);
+        }
+
+        [LinuxImageTheory]
+        [MemberData(nameof(GetMonitorImageData))]
+        public void VerifyShellNotInstalledForDistroless(ProductImageData imageData)
+        {
+            base.VerifyCommonShellNotInstalledForDistroless(imageData);
+        }
+
+        [DotNetTheory]
+        [MemberData(nameof(GetMonitorImageData))]
+        public void VerifyNoSasToken(ProductImageData imageData)
+        {
+            base.VerifyCommonNoSasToken(imageData);
+        }
+
+        [DotNetTheory]
+        [MemberData(nameof(GetMonitorImageData))]
+        public void VerifyDefaultUser(ProductImageData imageData)
+        {
+            VerifyCommonDefaultUser(imageData);
         }
 
         /// <summary>
         /// Verifies that the environment variables essential to dotnet-monitor are set correctly.
         /// </summary>
         [LinuxImageTheory]
-        [MemberData(nameof(GetImageData))]
-        public void VerifyEnvironmentVariables(MonitorImageData imageData)
+        [MemberData(nameof(GetMonitorImageData))]
+        public void VerifyEnvironmentVariables(ProductImageData imageData)
         {
             List<EnvironmentVariableInfo> variables = new List<EnvironmentVariableInfo>();
             variables.AddRange(ProductImageTests.GetCommonEnvironmentVariables());
 
-            // ASPNETCORE_URLS has been unset to allow the default URL binding to occur.
-            variables.Add(new EnvironmentVariableInfo("ASPNETCORE_URLS", string.Empty));
+            if (imageData.Version.Major <= 7) {
+                // ASPNETCORE_URLS has been unset to allow the default URL binding to occur.
+                variables.Add(new EnvironmentVariableInfo("ASPNETCORE_URLS", string.Empty));
+            } else {
+                variables.Add(new EnvironmentVariableInfo("ASPNETCORE_HTTP_PORTS", string.Empty));
+            }
             // Diagnostics should be disabled
             variables.Add(new EnvironmentVariableInfo("COMPlus_EnableDiagnostics", "0"));
             // DefaultProcess filter should select a process with a process ID of 1
             variables.Add(new EnvironmentVariableInfo("DefaultProcess__Filters__0__Key", "ProcessId"));
             variables.Add(new EnvironmentVariableInfo("DefaultProcess__Filters__0__Value", "1"));
+            // Existing (orphaned) diagnostic port should be delete before starting server
+            variables.Add(new EnvironmentVariableInfo("DiagnosticPort__DeleteEndpointOnStartup", "true"));
+            if (imageData.Version.Major != 6)
+            {
+                // GC mode should be set to Server
+                variables.Add(new EnvironmentVariableInfo("DOTNET_gcServer", "1"));
+            }
             // Console logger format should be JSON and output UTC timestamps without timezone information
             variables.Add(new EnvironmentVariableInfo("Logging__Console__FormatterName", "json"));
             variables.Add(new EnvironmentVariableInfo("Logging__Console__FormatterOptions__TimestampFormat", "yyyy-MM-ddTHH:mm:ss.fffffffZ"));
@@ -101,7 +145,7 @@ namespace Microsoft.DotNet.Docker.Tests
 
             EnvironmentVariableInfo.Validate(
                 variables,
-                imageData.GetImage(DockerHelper),
+                imageData.GetImage(ImageRepo, DockerHelper),
                 imageData,
                 DockerHelper);
         }
@@ -111,8 +155,8 @@ namespace Microsoft.DotNet.Docker.Tests
         /// and the metrics endpoint is usable without providing authentication.
         /// </summary>
         [LinuxImageTheory]
-        [MemberData(nameof(GetImageData))]
-        public Task VerifyMonitorDefault(MonitorImageData imageData)
+        [MemberData(nameof(GetMonitorImageData))]
+        public Task VerifyMonitorDefault(ProductImageData imageData)
         {
             return VerifyMonitorAsync(imageData, noAuthentication: false);
         }
@@ -123,8 +167,8 @@ namespace Microsoft.DotNet.Docker.Tests
         /// providing authentication.
         /// </summary>
         [LinuxImageTheory]
-        [MemberData(nameof(GetImageData))]
-        public Task VerifyMonitorNoHttps(MonitorImageData imageData)
+        [MemberData(nameof(GetMonitorImageData))]
+        public Task VerifyMonitorNoHttpsUnconfiguredAuth(ProductImageData imageData)
         {
             return VerifyMonitorAsync(
                 imageData,
@@ -133,9 +177,8 @@ namespace Microsoft.DotNet.Docker.Tests
                 {
                     if (!Config.IsHttpVerificationDisabled)
                     {
-                        // Verify processes returns 401 (Unauthorized) since authentication was not provided.
-                        using HttpResponseMessage processesMessage =
-                        await ImageScenarioVerifier.GetHttpResponseFromContainerAsync(
+                        // Verify processes returns 401 (Unauthorized) since authentication was not configured.
+                        await WebScenario.VerifyHttpResponseFromContainerAsync(
                             containerName,
                             DockerHelper,
                             OutputHelper,
@@ -156,8 +199,8 @@ namespace Microsoft.DotNet.Docker.Tests
         /// and the metrics ports are usable without providing authentication.
         /// </summary>
         [LinuxImageTheory]
-        [MemberData(nameof(GetImageData))]
-        public Task VerifyMonitorNoHttpsNoAuth(MonitorImageData imageData)
+        [MemberData(nameof(GetMonitorImageData))]
+        public Task VerifyMonitorNoHttpsNoAuth(ProductImageData imageData)
         {
             return VerifyMonitorAsync(
                 imageData,
@@ -168,7 +211,7 @@ namespace Microsoft.DotNet.Docker.Tests
                     {
                         // Verify metrics endpoint is accessible and produces zero processes
                         using HttpResponseMessage processesMessage =
-                            await ImageScenarioVerifier.GetHttpResponseFromContainerAsync(
+                            await WebScenario.GetHttpResponseFromContainerAsync(
                                 containerName,
                                 DockerHelper,
                                 OutputHelper,
@@ -190,15 +233,69 @@ namespace Microsoft.DotNet.Docker.Tests
         }
 
         /// <summary>
+        /// Tests that the image can run without https enabled and that the artifacts ports
+        /// are accessible with valid authorization header.
+        /// </summary>
+        [LinuxImageTheory]
+        [MemberData(nameof(GetMonitorImageData))]
+        public Task VerifyMonitorNoHttpsWithAuth(ProductImageData imageData)
+        {
+            GenerateKeyOutput output = GenerateKey(imageData);
+            AuthenticationHeaderValue authorizationHeader = AuthenticationHeaderValue.Parse(output.AuthorizationHeader);
+
+            return VerifyMonitorAsync(
+                imageData,
+                noAuthentication: false,
+                async containerName =>
+                {
+                    if (!Config.IsHttpVerificationDisabled)
+                    {
+                        // Verify processes returns 401 (Unauthorized) since authentication was not provided.
+                        await WebScenario.VerifyHttpResponseFromContainerAsync(
+                            containerName,
+                            DockerHelper,
+                            OutputHelper,
+                            DefaultArtifactsPort,
+                            UrlPath_Processes,
+                            m => VerifyStatusCode(m, HttpStatusCode.Unauthorized));
+
+                        // Verify processes is accessible using authorization header
+                        using HttpResponseMessage processesMessage =
+                            await WebScenario.GetHttpResponseFromContainerAsync(
+                                containerName,
+                                DockerHelper,
+                                OutputHelper,
+                                DefaultArtifactsPort,
+                                UrlPath_Processes,
+                                authorizationHeader: authorizationHeader);
+
+                        JsonElement rootElement = GetContentAsJsonElement(processesMessage);
+
+                        // Verify returns an empty array (should not detect any processes)
+                        Assert.Equal(JsonValueKind.Array, rootElement.ValueKind);
+                        Assert.Equal(0, rootElement.GetArrayLength());
+                    }
+                },
+                builder =>
+                {
+                    // Reset and expose the artifacts port over http (not secure)
+                    builder.MonitorUrl(DefaultArtifactsPort);
+                    // Configuration authentication
+                    builder.MonitorApiKey(output.Authentication.MonitorApiKey);
+                },
+                authorizationHeader);
+        }
+
+        /// <summary>
         /// Verifies that the image can discover a dotnet process
         /// in another container via mounting the /tmp directory.
         /// </summary>
         [LinuxImageTheory]
         [MemberData(nameof(GetScenarioData))]
-        public Task VerifyConnectMode(MonitorImageData imageData, SampleImageData sampleData)
+        public Task VerifyConnectMode(ProductImageData imageData, SampleImageData sampleData)
         {
             return VerifyScenarioAsync(
-                monitorImageData: imageData,
+                productImageData: imageData,
                 sampleImageData: sampleData,
                 shareTmpVolume: true,
                 listenDiagPortVolume: false,
@@ -208,7 +305,7 @@ namespace Microsoft.DotNet.Docker.Tests
                     if (!Config.IsHttpVerificationDisabled)
                     {
                         using HttpResponseMessage responseMessage =
-                            await ImageScenarioVerifier.GetHttpResponseFromContainerAsync(
+                            await WebScenario.GetHttpResponseFromContainerAsync(
                                 monitorName,
                                 DockerHelper,
                                 OutputHelper,
@@ -230,10 +327,10 @@ namespace Microsoft.DotNet.Docker.Tests
         /// </summary>
         [LinuxImageTheory]
         [MemberData(nameof(GetScenarioData))]
-        public Task VerifyListenMode(MonitorImageData imageData, SampleImageData sampleData)
+        public Task VerifyListenMode(ProductImageData imageData, SampleImageData sampleData)
         {
             return VerifyScenarioAsync(
-                monitorImageData: imageData,
+                productImageData: imageData,
                 sampleImageData: sampleData,
                 shareTmpVolume: false,
                 listenDiagPortVolume: true,
@@ -243,7 +340,7 @@ namespace Microsoft.DotNet.Docker.Tests
                     if (!Config.IsHttpVerificationDisabled)
                     {
                         using HttpResponseMessage responseMessage =
-                            await ImageScenarioVerifier.GetHttpResponseFromContainerAsync(
+                            await WebScenario.GetHttpResponseFromContainerAsync(
                                 monitorName,
                                 DockerHelper,
                                 OutputHelper,
@@ -267,12 +364,14 @@ namespace Microsoft.DotNet.Docker.Tests
         /// <param name="verifyContainerAsync">Callback to test some aspect of the container.</param>
         /// <param name="runArgsCallback">Allows for modifying the "docker run" args of the container.</param>
         private async Task VerifyMonitorAsync(
-            MonitorImageData imageData,
+            ProductImageData imageData,
             bool noAuthentication,
             Func<string, Task> verifyContainerAsync = null,
-            Action<DockerRunArgsBuilder> runArgsCallback = null)
+            Action<DockerRunArgsBuilder> runArgsCallback = null,
+            AuthenticationHeaderValue authorizationHeader = null
+            )
         {
-            GetNames(imageData, out string monitorImageName, out string monitorContainerName);
+            GetNames(imageData, out string monitorImageName, out string monitorContainerName, out _);
             try
             {
                 DockerRunArgsBuilder runArgsBuilder = DockerRunArgsBuilder.Create()
@@ -286,20 +385,22 @@ namespace Microsoft.DotNet.Docker.Tests
                 DockerHelper.Run(
                     image: monitorImageName,
                     name: monitorContainerName,
-                    command: GetMonitorAdditionalArgs(noAuthentication),
+                    command: GetMonitorAdditionalArgs(imageData, noAuthentication),
                     detach: true,
-                    optionalRunArgs: runArgsBuilder.Build());
+                    optionalRunArgs: runArgsBuilder.Build(),
+                    skipAutoCleanup: true);
 
                 if (!Config.IsHttpVerificationDisabled)
                 {
                     // Verify metrics endpoint is accessible
                     using HttpResponseMessage metricsMessage =
-                        await ImageScenarioVerifier.GetHttpResponseFromContainerAsync(
+                        await WebScenario.GetHttpResponseFromContainerAsync(
                             monitorContainerName,
                             DockerHelper,
                             OutputHelper,
                             DefaultMetricsPort,
-                            UrlPath_Metrics);
+                            UrlPath_Metrics,
+                            authorizationHeader: authorizationHeader);
 
                     string metricsContent = await metricsMessage.Content.ReadAsStringAsync();
 
@@ -322,7 +423,7 @@ namespace Microsoft.DotNet.Docker.Tests
         /// <summary>
         /// Runs a single instance of each of the dotnet-monitor and samples images.
         /// </summary>
-        /// <param name="monitorImageData">The image data of the dotnet-monitor image.</param>
+        /// <param name="productImageData">The image data of the dotnet-monitor image.</param>
         /// <param name="shareTmpVolume">Set to true to mount the /tmp directory in both containers.</param>
         /// <param name="listenDiagPortVolume">
         /// Set to true to have the monitor container listen with a diagnostic port listener
@@ -333,7 +434,7 @@ namespace Microsoft.DotNet.Docker.Tests
         /// <param name="monitorRunArgsCallback">Allows for modifying the "docker run" args of the dotnet-monitor container.</param>
         /// <param name="sampleRunArgsCallback">Allows for modifying the "docker run" args of the samples container.</param>
         private async Task VerifyScenarioAsync(
-            MonitorImageData monitorImageData,
+            ProductImageData productImageData,
             SampleImageData sampleImageData,
             bool shareTmpVolume,
             bool listenDiagPortVolume,
@@ -342,8 +443,8 @@ namespace Microsoft.DotNet.Docker.Tests
             Action<DockerRunArgsBuilder> monitorRunArgsCallback = null,
             Action<DockerRunArgsBuilder> sampleRunArgsCallback = null)
         {
-            GetNames(monitorImageData, out string monitorImageName, out string monitorContainerName);
-            GetNames(sampleImageData, out string sampleImageName, out string sampleContainerName);
+            GetNames(productImageData, out string monitorImageName, out string monitorContainerName, out int monitorUser);
+            GetNames(sampleImageData, out string sampleImageName, out string sampleContainerName, out int sampleUser);
 
             DockerRunArgsBuilder monitorArgsBuilder = DockerRunArgsBuilder.Create()
                 .MonitorUrl(DefaultArtifactsPort);
@@ -356,10 +457,16 @@ namespace Microsoft.DotNet.Docker.Tests
 
             try
             {
+                int? volumeUid = AdjustMonitorUserAndCalculateVolumeOwner(
+                    listenDiagPortVolume,
+                    sampleUser,
+                    monitorUser,
+                    monitorArgsBuilder);
+
                 // Create a volume for the two containers to share the /tmp directory.
                 if (shareTmpVolume)
                 {
-                    tmpVolumeName = DockerHelper.CreateVolume(UniqueName("tmpvol"));
+                    tmpVolumeName = DockerHelper.CreateTmpfsVolume(UniqueName("tmpvol"), volumeUid);
 
                     monitorArgsBuilder.VolumeMount(tmpVolumeName, Directory_Tmp);
 
@@ -371,7 +478,7 @@ namespace Microsoft.DotNet.Docker.Tests
                 // process can connect to the dotnet-monitor process.
                 if (listenDiagPortVolume)
                 {
-                    diagPortVolumeName = DockerHelper.CreateVolume(UniqueName("diagportvol"));
+                    diagPortVolumeName = DockerHelper.CreateTmpfsVolume(UniqueName("diagportvol"), volumeUid);
 
                     monitorArgsBuilder.VolumeMount(diagPortVolumeName, Directory_Diag);
                     monitorArgsBuilder.MonitorListen(File_DiagPort);
@@ -397,15 +504,17 @@ namespace Microsoft.DotNet.Docker.Tests
                     image: sampleImageName,
                     name: sampleContainerName,
                     detach: true,
-                    optionalRunArgs: sampleArgsBuilder.Build());
+                    optionalRunArgs: sampleArgsBuilder.Build(),
+                    skipAutoCleanup: true);
 
                 // Run the dotnet-monitor container
                 DockerHelper.Run(
                     image: monitorImageName,
                     name: monitorContainerName,
-                    command: GetMonitorAdditionalArgs(noAuthentication),
+                    command: GetMonitorAdditionalArgs(productImageData, noAuthentication),
                     detach: true,
-                    optionalRunArgs: monitorArgsBuilder.Build());
+                    optionalRunArgs: monitorArgsBuilder.Build(),
+                    skipAutoCleanup: true);
 
                 await verifyContainerAsync(
                     monitorContainerName,
@@ -429,34 +538,119 @@ namespace Microsoft.DotNet.Docker.Tests
             }
         }
 
+        private static int? AdjustMonitorUserAndCalculateVolumeOwner(bool listenMode, int sampleUid, int monitorUid, DockerRunArgsBuilder monitorArgsBuilder)
+        {
+            // Make sure volume is accessible by sample app without modifying the sample container
+            // and ensure monitor app can access it, even if needing to change its user. This is
+            // done by making the volume owned by the least privileged user; if they are the same user or
+            // are different non-root users, defer to the user of the sample image.
+
+            if (!IsRoot(sampleUid))
+            {
+                if (sampleUid != monitorUid)
+                {
+                    // If sample is connecting to monitor OR (monitor is connecting to sample AND is not running as root),
+                    // change monitor to run as same user as sample. In general, a client has to either be root or
+                    // the same user as the server for UDS connections.
+                    if (listenMode || !IsRoot(monitorUid))
+                    {
+                        monitorArgsBuilder.AsUser(sampleUid);
+                    }
+                }
+
+                return sampleUid;
+            }
+            else if (!IsRoot(monitorUid))
+            {
+                // Sample is root; monitor is non-root
+
+                if (listenMode)
+                {
+                    // Monitor has UDS to which sample will connect, which it can without changes since
+                    // it is running as root; use monitor user as volume owner
+                    return monitorUid;
+                }
+                else
+                {
+                    // Sample has UDS to which monitor will connect, which requires monitor to run as
+                    // root as well; use sample user as volume owner
+                    monitorArgsBuilder.AsUser(sampleUid);
+
+                    return sampleUid;
+                }
+            }
+
+            // Both sample and monitor run as root: no volume ownership change necessary
+            Debug.Assert(IsRoot(sampleUid) && IsRoot(monitorUid));
+            return null;
+
+            static bool IsRoot(int uid)
+            {
+                return 0 == uid;
+            }
+        }
+
         private static string UniqueName(string name)
         {
             return $"{name}-{DateTime.Now.ToFileTime()}";
         }
 
-        private static SampleImageData GetSampleImageData(MonitorImageData imageData)
+        private static SampleImageData GetSampleImageData(ProductImageData imageData)
         {
             return TestData.GetSampleImageData()
                 .First(d => d.IsPublished = true && d.Arch == imageData.Arch);
         }
 
-        private static string GetMonitorAdditionalArgs(bool noAuthentication)
+        private static string GetMonitorAdditionalArgs(ProductImageData imageData, bool noAuthentication)
         {
-            return noAuthentication ? Switch_NoAuthentication : null;
+            const char spaceChar = ' ';
+
+            // This determines if we are going to add the default args that are included in the entrypoint in images before 7.0
+            // This flag should be thought of as "We want to add anything to the commandline and are 7.0+".
+            // This is required for 7.0+ images when command line arguments are being appended because docker
+            // will treat the presence of any commandline args as overriding the entire CMD block in the DockerFile.
+            bool addDefaultArgs =
+                // We are version 7.0+, this will never apply to 6.x images
+                imageData.Version.Major >= 7 &&
+                // We are adding anything to the command line. When additional flags are added to this method, `noAuthentication`
+                // should be replaced something like `(noAuthentication || myNewFlag || mySetting != Setting.Default)`
+                noAuthentication;
+
+            // Standard here is to have the built command line always end with a space, so it needs to start with one
+            StringBuilder builtCommandline = new StringBuilder(spaceChar);
+
+            if (addDefaultArgs)
+            {
+                builtCommandline.AppendFormat("{0} ", Switch_DefaultImageCmd);
+            }
+
+            if (noAuthentication)
+            {
+                builtCommandline.AppendFormat("{0} ", Switch_NoAuthentication);
+            }
+
+            string cmdsResult = builtCommandline.ToString().Trim(spaceChar);
+
+            return cmdsResult;
         }
 
-        private void GetNames(MonitorImageData imageData, out string imageName, out string containerName)
+        private void GetNames(ProductImageData imageData, out string imageName, out string containerName, out int userIdentifier)
         {
-            imageName = imageData.GetImage(DockerHelper);
+            imageName = imageData.GetImage(ImageRepo, DockerHelper);
             containerName = imageData.GetIdentifier("monitortest");
+            // If user is empty, then image is running as same as docker daemon (typically root)
+            userIdentifier = string.IsNullOrEmpty(DockerHelper.GetImageUser(imageName)) ? 0 : imageData.NonRootUID.Value;
         }
 
-        private void GetNames(SampleImageData imageData, out string imageName, out string containerName)
+        private void GetNames(SampleImageData imageData, out string imageName, out string containerName, out int userIdentifier)
         {
             // Need to allow pulling of the sample image since these are not built in the same pipeline
             // as the other images; otherwise, these tests will fail due to lack of sample image.
-            imageName = imageData.GetImage(SampleImageType.Aspnetapp, DockerHelper, allowPull: true);
+            string tag = imageData.GetTagNameBase(SampleImageType.Aspnetapp);
+            imageName = imageData.GetImage(tag, DockerHelper, allowPull: true);
             containerName = imageData.GetIdentifier("monitortest-sample");
+            // If user is empty, then image is running as same as docker daemon (typically root)
+            userIdentifier = string.IsNullOrEmpty(DockerHelper.GetImageUser(imageName)) ? 0 : imageData.NonRootUID.Value;
         }
 
         private void VerifyStatusCode(HttpResponseMessage message, HttpStatusCode statusCode)
@@ -474,11 +668,41 @@ namespace Microsoft.DotNet.Docker.Tests
                 return JsonDocument.Parse(stream).RootElement;
             }
         }
+
+        private GenerateKeyOutput GenerateKey(ProductImageData imageData)
+        {
+            GetNames(imageData, out string monitorImageName, out string monitorContainerName, out _);
+            try
+            {
+                DockerRunArgsBuilder runArgsBuilder = DockerRunArgsBuilder.Create()
+                    .Entrypoint("dotnet-monitor");
+
+                string json = DockerHelper.Run(
+                    image: monitorImageName,
+                    name: monitorContainerName,
+                    command: "generatekey -o machinejson",
+                    optionalRunArgs: runArgsBuilder.Build());
+
+                GenerateKeyOutput output = JsonSerializer.Deserialize<GenerateKeyOutput>(json);
+
+                Assert.NotNull(output?.Authentication?.MonitorApiKey?.PublicKey);
+                Assert.NotNull(output?.Authentication?.MonitorApiKey?.Subject);
+                Assert.NotNull(output?.AuthorizationHeader);
+
+                return output;
+            }
+            finally
+            {
+                DockerHelper.DeleteContainer(monitorContainerName);
+            }
+        }
     }
 
     internal static class MonitorDockerRunArgsBuilderExtensions
     {
         // dotnet-monitor variables
+        internal const string EnvVar_Authentication_MonitorApiKey_PublicKey = "DotnetMonitor_Authentication__MonitorApiKey__PublicKey";
+        internal const string EnvVar_Authentication_MonitorApiKey_Subject = "DotnetMonitor_Authentication__MonitorApiKey__Subject";
         internal const string EnvVar_DiagnosticPort_ConnectionMode = "DotnetMonitor_DiagnosticPort__ConnectionMode";
         internal const string EnvVar_DiagnosticPort_EndpointName = "DotnetMonitor_DiagnosticPort__EndpointName";
         internal const string EnvVar_Metrics_Enabled = "DotnetMonitor_Metrics__Enabled";
@@ -486,6 +710,13 @@ namespace Microsoft.DotNet.Docker.Tests
 
         // runtime variables
         internal const string EnvVar_DiagnosticPorts = "DOTNET_DiagnosticPorts";
+
+        public static DockerRunArgsBuilder MonitorApiKey(this DockerRunArgsBuilder builder, MonitorApiKeyOptions options)
+        {
+            return builder
+                .EnvironmentVariable(EnvVar_Authentication_MonitorApiKey_PublicKey, options.PublicKey)
+                .EnvironmentVariable(EnvVar_Authentication_MonitorApiKey_Subject, options.Subject);
+        }
 
         /// <summary>
         /// Disables the metrics endpoint in dotnet-monitor.
@@ -528,5 +759,27 @@ namespace Microsoft.DotNet.Docker.Tests
         {
             return $"http://*:{port}";
         }
+    }
+
+    /// <summary>
+    /// Represents the structured output of a "dotnet-monitor generatekey -o machinejson" invocation.
+    /// </summary>
+    internal sealed class GenerateKeyOutput
+    {
+        public AuthenticationOptions Authentication { get; set; }
+
+        public string AuthorizationHeader { get; set; }
+    }
+
+    internal sealed class AuthenticationOptions
+    {
+        public MonitorApiKeyOptions MonitorApiKey { get; set; }
+    }
+
+    internal sealed class MonitorApiKeyOptions
+    {
+        public string PublicKey { get; set; }
+
+        public string Subject { get; set; }
     }
 }

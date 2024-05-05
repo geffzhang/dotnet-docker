@@ -1,23 +1,14 @@
-## Container sample: Run a simple application
-
-You can quickly run a container with a pre-built [.NET Docker image](https://hub.docker.com/_/microsoft-dotnet-samples/), based on the [.NET console sample](https://github.com/dotnet/dotnet-docker/blob/main/samples/dotnetapp/README.md).
-
-Type the following command to run a sample console application:
-
-```console
-docker run --rm mcr.microsoft.com/dotnet/samples
-```
-
-## Container sample: Run a web application
-
-You can quickly run a container with a pre-built [.NET Docker image](https://hub.docker.com/_/microsoft-dotnet-samples/), based on the [ASP.NET Core sample](https://github.com/dotnet/dotnet-docker/blob/main/samples/aspnetapp/README.md).
-
-Type the following command to run a sample web application:
-
-```console
-docker run -it --rm -p 8000:80 --name aspnetcore_sample mcr.microsoft.com/dotnet/samples:aspnetapp
-```
-
-After the application starts, navigate to `http://localhost:8000` in your web browser.
-
-See [Hosting ASP.NET Core Images with Docker over HTTPS](https://github.com/dotnet/dotnet-docker/blob/main/samples/host-aspnetcore-https.md) to use HTTPS with this image.
+{{
+    _ ARGS:
+      top-header: The string to use as the top-level header.
+      readme-host: Moniker of the site that will host the readme ^
+    set templateQualifier to when(IS_PRODUCT_FAMILY,
+        "samples",
+        when(PARENT_REPO = "monitor", cat("monitor-", SHORT_REPO), SHORT_REPO))
+}}{{ARGS["top-header"]}} Usage
+{{ _ Special case while aspire-dashboard image doesn't have any samples. Remove when https://github.com/dotnet/dotnet-docker/issues/5335 is resolved. ^
+if templateQualifier != "aspire-dashboard":
+The [.NET Docker samples](https://github.com/dotnet/dotnet-docker/blob/main/samples/README.md) show various ways to use .NET and Docker together. See [Building Docker Images for .NET Applications](https://docs.microsoft.com/dotnet/core/docker/building-net-docker-images) to learn more.
+}}
+{{InsertTemplate(join(["Use", templateQualifier, "md"], "."),
+  [ "top-header": ARGS["top-header"], "readme-host": ARGS["readme-host"]])}}

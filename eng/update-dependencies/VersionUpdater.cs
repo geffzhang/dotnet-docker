@@ -21,17 +21,19 @@ namespace Dotnet.Docker
         private static readonly string s_versionGroupName = "versionValue";
 
         private readonly string _productName;
+        private readonly Options _options;
         private readonly VersionType _versionType;
 
-        public VersionUpdater(VersionType versionType, string productName, string dockerfileVersion, string repoRoot) : base()
+        public VersionUpdater(VersionType versionType, string productName, string dockerfileVersion, string repoRoot, Options options)
         {
             _productName = productName;
+            _options = options;
             _versionType = versionType;
-            string versionVariableName = GetVersionVariableName(versionType, productName, dockerfileVersion);
+            string versionVariableName = ManifestHelper.GetVersionVariableName(versionType, productName, dockerfileVersion);
 
             Trace.TraceInformation($"Updating {versionVariableName}");
 
-            Path = System.IO.Path.Combine(repoRoot, Program.VersionsFilename);
+            Path = System.IO.Path.Combine(repoRoot, UpdateDependencies.VersionsFilename);
             VersionGroupName = s_versionGroupName;
             Regex = GetVersionVariableRegex(versionVariableName);
         }
@@ -61,7 +63,7 @@ namespace Dotnet.Docker
                 productName = "sdk";
             }
 
-            string versionVariableName = GetVersionVariableName(VersionType.Build, productName, dockerfileVersion);
+            string versionVariableName = ManifestHelper.GetVersionVariableName(VersionType.Build, productName, dockerfileVersion);
             Regex regex = GetVersionVariableRegex(versionVariableName);
             Match match = regex.Match(variables);
             if (!match.Success)
@@ -72,7 +74,7 @@ namespace Dotnet.Docker
             return match.Groups[s_versionGroupName].Value;
         }
 
-        private static string GetProductVersion(IDependencyInfo productInfo)
+        private string GetProductVersion(IDependencyInfo productInfo)
         {
             if (productInfo.SimpleVersion is null)
             {
@@ -94,14 +96,13 @@ namespace Dotnet.Docker
                 }
             }
 
-            return version;
+            return UpdateDependencies.ResolveProductVersion(version, _options);
         }
 
         private static Regex GetVersionVariableRegex(string versionVariableName) =>
-            new Regex($"\"{Regex.Escape(versionVariableName)}\": \"(?<{s_versionGroupName}>[\\d]+.[\\d]+.[\\d]+(-[\\w]+(.[\\d]+)*)?)\"");
-
-        private static string GetVersionVariableName(VersionType versionType, string productName, string dockerfileVersion) =>
-            $"{productName}|{dockerfileVersion}|{versionType.ToString().ToLowerInvariant()}-version";
+            ManifestHelper.GetManifestVariableRegex(
+                versionVariableName,
+                $"(?<{s_versionGroupName}>[\\d]+.[\\d]+.[\\d]+(-[\\w]+(.[\\d]+)*)?)");
     }
 }
 #nullable disable

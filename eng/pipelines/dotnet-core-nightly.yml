@@ -10,12 +10,24 @@ trigger:
     - src/*
 pr: none
 
-variables:
-- template: variables/core.yml
-- name: officialBranches
-  value: "'nightly'"
+resources:
+  repositories:
+  - repository: InternalVersionsRepo
+    type: github
+    endpoint: dotnet
+    name: dotnet/versions
 
-stages:
-- template: ../common/templates/stages/build-test-publish-repo.yml
+variables:
+- template: /eng/pipelines/variables/core.yml@self
+- name: officialBranches
+  # comma-delimited list of branch names
+  value: nightly
+
+extends:
+  template: /eng/common/templates/1es-official.yml@self
   parameters:
-    testMatrixCustomBuildLegGroupArgs: --custom-build-leg-group test-dependencies
+    stages:
+    - template: /eng/pipelines/stages/build-test-publish-repo.yml@self
+      parameters:
+        internalProjectName: ${{ variables.internalProjectName }}
+        publicProjectName: ${{ variables.publicProjectName }}

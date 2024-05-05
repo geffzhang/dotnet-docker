@@ -1,7 +1,10 @@
 #!/usr/bin/env pwsh
 param(
-    [switch]$Validate
+    [switch]$Validate,
+    [string]$Branch
 )
+
+Import-Module -force $PSScriptRoot/../DependencyManagement.psm1
 
 if ($Validate) {
     $customImageBuilderArgs = " --validate"
@@ -17,6 +20,10 @@ $onDockerfilesGenerated = {
     }
 }
 
+if (!$Branch) {
+    $Branch = Get-Branch
+}
+
 & $PSScriptRoot/../common/Invoke-ImageBuilder.ps1 `
-    -ImageBuilderArgs "generateDockerfiles --architecture '*' --os-type '*'$customImageBuilderArgs" `
+    -ImageBuilderArgs "generateDockerfiles --architecture '*' --os-type '*'$customImageBuilderArgs --var branch=$Branch" `
     -OnCommandExecuted $onDockerfilesGenerated

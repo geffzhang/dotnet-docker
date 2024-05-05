@@ -38,7 +38,7 @@ namespace Microsoft.DotNet.Docker.Tests
         [MemberData(nameof(GetImageData))]
         public async Task VerifyDotnetSample(SampleImageData imageData)
         {
-            if (imageData.DockerfileSuffix == "windowsservercore-iis-x64")
+            if (imageData.DockerfileSuffix == "windowsservercore-iis")
             {
                 return;
             }
@@ -65,17 +65,20 @@ namespace Microsoft.DotNet.Docker.Tests
 
             await VerifySampleAsync(imageData, SampleImageType.Aspnetapp, async (image, containerName) =>
             {
+                int port = imageData.DockerfileSuffix == "windowsservercore-iis" ? 80 : imageData.DefaultPort;
+
                 try
                 {
                     DockerHelper.Run(
                         image: image,
                         name: containerName,
                         detach: true,
-                        optionalRunArgs: "-p 80");
+                        optionalRunArgs: $"-p {port}",
+                        skipAutoCleanup: true);
 
                     if (!Config.IsHttpVerificationDisabled)
                     {
-                        await ImageScenarioVerifier.VerifyHttpResponseFromContainerAsync(containerName, DockerHelper, OutputHelper);
+                        await WebScenario.VerifyHttpResponseFromContainerAsync(containerName, DockerHelper, OutputHelper, port);
                     }
 
                     ValidateEnvironmentVariables(imageData, image, SampleImageType.Aspnetapp);
@@ -90,6 +93,12 @@ namespace Microsoft.DotNet.Docker.Tests
         [Fact]
         public void VerifyComplexAppSample()
         {
+            // complexapp sample doesn't currently support building on Windows.
+            if (!DockerHelper.IsLinuxContainerModeEnabled)
+            {
+                return;
+            }
+
             string appTag = SampleImageData.GetImageName("complexapp-local-app");
             string testTag = SampleImageData.GetImageName("complexapp-local-test");
             string sampleFolder = Path.Combine(s_samplesPath, "complexapp");
@@ -126,8 +135,8 @@ namespace Microsoft.DotNet.Docker.Tests
                 XElement summary = doc.Root.Element(XName.Get("ResultSummary", doc.Root.Name.NamespaceName));
                 Assert.Equal("Completed", summary.Attribute("outcome").Value);
                 XElement counters = summary.Element(XName.Get("Counters", doc.Root.Name.NamespaceName));
-                Assert.Equal("2", counters.Attribute("total").Value);
-                Assert.Equal("2", counters.Attribute("passed").Value);
+                Assert.Equal("3", counters.Attribute("total").Value);
+                Assert.Equal("3", counters.Attribute("passed").Value);
             }
             finally
             {
@@ -154,9 +163,13 @@ namespace Microsoft.DotNet.Docker.Tests
                 if (!imageData.IsPublished)
                 {
                     string sampleFolder = Path.Combine(s_samplesPath, imageType);
-                    string dockerfilePath = $"{sampleFolder}/Dockerfile.{imageData.DockerfileSuffix}";
+                    string dockerfilePath = $"{sampleFolder}/Dockerfile";
+                    if (!string.IsNullOrEmpty(imageData.DockerfileSuffix))
+                    {
+                        dockerfilePath += $".{imageData.DockerfileSuffix}";
+                    }
 
-                    DockerHelper.Build(image, dockerfilePath, contextDir: sampleFolder, pull: Config.PullImages);
+                    DockerHelper.Build(image, dockerfilePath, contextDir: sampleFolder, pull: Config.PullImages, platform: imageData.Platform);
                 }
 
                 string containerName = imageData.GetIdentifier($"sample-{imageType}");
@@ -178,9 +191,9 @@ namespace Microsoft.DotNet.Docker.Tests
 
             if (imageType == SampleImageType.Aspnetapp)
             {
-                variables.Add(new EnvironmentVariableInfo("ASPNETCORE_URLS", "http://+:80"));
+                variables.Add(new EnvironmentVariableInfo("ASPNETCORE_HTTP_PORTS", imageData.DefaultPort.ToString()));
             }
-            
+
             EnvironmentVariableInfo.Validate(
                 variables,
                 image,

@@ -7,19 +7,23 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Text.RegularExpressions;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Xunit;
 
 namespace Microsoft.DotNet.Docker.Tests
 {
-    public abstract class ImageData
+    public abstract record ImageData
     {
         private readonly List<string> _pulledImages = new List<string>();
 
         public Arch Arch { get; set; }
         public bool IsArm => Arch == Arch.Arm || Arch == Arch.Arm64;
         public string OS { get; set; }
+        public bool IsDistroless => OS.Contains("distroless") || OS.Contains("chiseled");
+        public virtual int DefaultPort => 8080;
+        public virtual int? NonRootUID => IsWindows ? null : 1654;
 
         private static readonly Lazy<JObject> s_imageInfoData;
 
@@ -38,43 +42,76 @@ namespace Microsoft.DotNet.Docker.Tests
             });
         }
 
+        public string Platform
+        {
+            get
+            {
+                string os = IsWindows ? "windows" : "linux";
+                string arch = Arch.ToString().ToLowerInvariant();
+                if (ArchVariant.Length > 0)
+                {
+                    arch += $"/{ArchVariant}";
+                }
+
+                return $"{os}/{arch}";
+            }
+        }
+
+        public string ArchVariant =>
+            Arch switch
+            {
+                Arch.Amd64 => string.Empty,
+                Arch.Arm => "v7",
+                Arch.Arm64 => "v8",
+                _ => throw new NotImplementedException()
+            };
+
+        public bool IsWindows => OS.StartsWith(Tests.OS.NanoServer) || OS.StartsWith(Tests.OS.ServerCore);
+
         public string Rid
         {
-            get {
+            get
+            {
                 string rid;
 
-                if (Arch == Arch.Arm)
+                if (IsWindows)
                 {
-                    if (OS.StartsWith(Tests.OS.AlpinePrefix))
-                    {
-                        rid = "linux-musl-arm";
-                    }
-                    else
-                    {
-                        rid = "linux-arm";
-                    }
-                }
-                else if (Arch == Arch.Arm64)
-                {
-                    if (OS.StartsWith(Tests.OS.AlpinePrefix))
-                    {
-                        rid = "linux-musl-arm64";
-                    }
-                    else
-                    {
-                        rid = "linux-arm64";
-                    }
-                }
-                else if (OS.StartsWith(Tests.OS.AlpinePrefix))
-                {
-                    rid = "linux-musl-x64";
+                    rid = "win-x64";
                 }
                 else
                 {
-                    rid = "linux-x64";
+                    string arch = Arch switch
+                    {
+                        Arch.Arm => "arm",
+                        Arch.Arm64 => "arm64",
+                        Arch.Amd64 => "x64",
+                        _ => throw new NotImplementedException()
+                    };
+                    string modifier = OS.StartsWith(Tests.OS.Alpine) ? "musl-" : "";
+                    rid = $"linux-{modifier}{arch}";
                 }
 
                 return rid;
+            }
+        }
+
+        public string OsVersion
+        {
+            get
+            {
+                const string PrefixGroup = "Prefix";
+                const string VersionGroup = "Version";
+                const string LtscPrefix = "ltsc";
+                string versionNumber = string.Empty;
+                Match match = Regex.Match(OS, @$"(-(?<{PrefixGroup}>[a-zA-Z_]*))?(?<{VersionGroup}>\d+.\d+)");
+
+                if (match.Groups[PrefixGroup].Success && match.Groups[PrefixGroup].Value == LtscPrefix)
+                {
+                    versionNumber = LtscPrefix;
+                }
+
+                versionNumber += match.Groups[VersionGroup].Value;
+                return versionNumber;
             }
         }
 
@@ -97,34 +134,33 @@ namespace Microsoft.DotNet.Docker.Tests
 
         public static string GetRepoNameModifier() => $"{(Config.IsNightlyRepo ? "/nightly" : string.Empty)}";
 
-        public static string GetImageName(string tag, string variantName, string repoNameModifier = null)
+        public static string GetImageName(string tag, string repoName, string repoNameModifier = null)
         {
-            string repo = $"dotnet{repoNameModifier ?? GetRepoNameModifier()}/{variantName}";
+            string repo = $"dotnet{repoNameModifier ?? GetRepoNameModifier()}/{repoName}";
             string registry = GetRegistryName(repo, tag);
 
             return $"{registry}{repo}:{tag}";
         }
 
-        protected string GetTagName(string tagPrefix, string os) =>
-            $"{tagPrefix}-{os}{GetArchTagSuffix()}";
-
-        protected virtual string GetArchTagSuffix()
+        protected string GetTagName(string tagPrefix, string os, string tagPostfix = null)
         {
-            if (Arch == Arch.Amd64 && DockerHelper.IsLinuxContainerModeEnabled)
-            {
-                return "-amd64";
-            }
-            else if (Arch == Arch.Arm)
-            {
-                return "-arm32v7";
-            }
-            else if (Arch == Arch.Arm64)
-            {
-                return "-arm64v8";
-            }
-
-            return string.Empty;
+            IEnumerable<string> tagParts = [ tagPrefix, os, tagPostfix, GetArchTagSuffix() ];
+            tagParts = tagParts.Where(s => !string.IsNullOrEmpty(s));
+            return string.Join('-', tagParts);
         }
+
+        protected virtual string GetArchTagSuffix() => (Arch == Arch.Amd64 && !DockerHelper.IsLinuxContainerModeEnabled)
+            ? string.Empty
+            : GetArchLabel();
+
+        protected string GetArchLabel() =>
+            Arch switch
+            {
+                Arch.Amd64 => "amd64",
+                Arch.Arm => "arm32v7",
+                Arch.Arm64 => "arm64v8",
+                _ => throw new NotSupportedException()
+            };
 
         private static string GetRegistryName(string repo, string tag)
         {
@@ -144,7 +180,7 @@ namespace Microsoft.DotNet.Docker.Tests
                     imageExistsInStaging = repoInfo.Value<JArray>("images")
                         .SelectMany(imageInfo => imageInfo.Value<JArray>("platforms"))
                         .Cast<JObject>()
-                        .Any(platformInfo => platformInfo.Value<JArray>("simpleTags").Any(imageTag => imageTag.ToString() == tag));
+                        .Any(platformInfo => platformInfo.Value<JArray>("simpleTags")?.Any(imageTag => imageTag.ToString() == tag) == true);
                 }
                 else
                 {

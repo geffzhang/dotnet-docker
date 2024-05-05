@@ -1,30 +1,18 @@
 parameters:
   name: null
+  pool: {}
   additionalOptions: null
-  
+  publicProjectName: null
+  customInitSteps: []
+
 jobs:
 - job: ${{ parameters.name }}
-  pool:
-    vmImage: $(defaultLinuxAmd64PoolImage)
+  pool: ${{ parameters.pool }}
   steps:
-  - template: ../steps/init-docker-linux.yml
-  - template: ../steps/set-dry-run.yml
-  - script: >
-      $(runImageBuilderCmd)
-      copyBaseImages
-      '$(acr.servicePrincipalName)'
-      '$(app-dotnetdockerbuild-client-secret)'
-      '$(acr.servicePrincipalTenant)'
-      '$(acr.subscription)'
-      '$(acr.resourceGroup)'
-      --registry-creds 'docker.io=$(dotnetDockerHubBot.userName);$(BotAccount-dotnet-dockerhub-bot-PAT)'
-      --repo-prefix $(mirrorRepoPrefix)
-      --registry-override '$(acr.server)'
-      --os-type 'linux'
-      --architecture '*'
-      $(dryRunArg)
-      ${{ parameters.additionalOptions }}
-    displayName: Copy Base Images
-    continueOnError: true
-  - template: ../steps/cleanup-docker-linux.yml
-
+  - template: /eng/common/templates/steps/init-docker-linux.yml@self
+  - ${{ parameters.customInitSteps }}
+  - template: /eng/common/templates/steps/copy-base-images.yml@self
+    parameters:
+      additionalOptions: ${{ parameters.additionalOptions }}
+      publicProjectName: ${{ parameters.publicProjectName }}
+      continueOnError: true

@@ -59,9 +59,15 @@ The [Dockerfile](Dockerfile) includes a `test` stage that demonstrates running v
 # test stage -- exposes optional entrypoint
 # target entrypoint with: docker build --target test
 FROM build AS test
+
+COPY tests/*.csproj tests/
 WORKDIR /source/tests
+RUN dotnet restore
+
 COPY tests/ .
-ENTRYPOINT ["dotnet", "test", "--logger:trx"]
+RUN dotnet build --no-restore
+
+ENTRYPOINT ["dotnet", "test", "--logger:trx", "--no-build"]
 ```
 
 The presence of the `test` stage costs very little and doesn't significantly change the behavior of the build if you don't specifically target it. By default, the test stage `ENTRYPOINT` will not be used if you build this Dockerfile
@@ -71,8 +77,8 @@ The following example demonstrates targeting the `test` stage with the `--target
 ```console
 PS C:\git\dotnet-docker\samples\complexapp> docker build --pull --target test -t complexapp-test .
 Sending build context to Docker daemon  12.81MB
-Step 1/15 : FROM mcr.microsoft.com/dotnet/sdk:5.0 AS build
-5.0: Pulling from dotnet/sdk
+Step 1/15 : FROM mcr.microsoft.com/dotnet/sdk:7.0 AS build
+7.0: Pulling from dotnet/sdk
 Successfully built f98c5453be3d
 Successfully tagged complexapp-test:latest
 SECURITY WARNING: You are building a Docker image from Windows against a non-Windows Docker host. All files and directories added to build context will have '-rwxr-xr-x' permissions. It is recommended to double check and reset permissions for sensitive files and directories.
@@ -85,16 +91,16 @@ PS C:\git\dotnet-docker\samples\complexapp> docker run --rm -v $pwd\TestResults:
   2 of 3 projects are up-to-date for restore.
   libbar -> /source/libbar/bin/Debug/netstandard2.0/libbar.dll
   libfoo -> /source/libfoo/bin/Debug/netstandard2.0/libfoo.dll
-  tests -> /source/tests/bin/Debug/net5.0/tests.dll
-Test run for /source/tests/bin/Debug/net5.0/tests.dll (.NETCoreApp,Version=v5.0)
-Microsoft (R) Test Execution Command Line Tool Version 16.8.0
+  tests -> /source/tests/bin/Debug/net7.0/tests.dll
+Test run for /source/tests/bin/Debug/net7.0/tests.dll (.NETCoreApp,Version=v7.0)
+Microsoft (R) Test Execution Command Line Tool Version 17.0.0
 Copyright (c) Microsoft Corporation.  All rights reserved.
 
 Starting test execution, please wait...
 A total of 1 test files matched the specified pattern.
 Results File: /source/tests/TestResults/_886d04dbf347_2020-11-02_18_30_59.trx
 
-Passed!  - Failed:     0, Passed:     2, Skipped:     0, Total:     2, Duration: 2 ms - /source/tests/bin/Debug/net5.0/tests.dll (net5.0)
+Passed!  - Failed:     0, Passed:     2, Skipped:     0, Total:     2, Duration: 2 ms - /source/tests/bin/Debug/net7.0/tests.dll (net7.0)
 
 PS C:\git\dotnet-docker\samples\complexapp> dir .\TestResults\
 
@@ -103,7 +109,7 @@ PS C:\git\dotnet-docker\samples\complexapp> dir .\TestResults\
 
 Mode                 LastWriteTime         Length Name
 ----                 -------------         ------ ----
--a----         11/2/2020  12:31 PM           3583 _886d04dbf347_2020-11-02_18_30_59.trx
+-a----         9/2/2021  12:31 PM           3583 _886d04dbf347_2021-09-02_18_30_59.trx
 ```
 
 The following instructions demonstrate this scenario in various configurations, with logging enabled.
@@ -156,10 +162,10 @@ You will see that tests are run while building the image, as you can see in the 
 ```console
 > docker build --pull -t complexapp .
 Sending build context to Docker daemon  12.79MB
-Step 1/24 : FROM mcr.microsoft.com/dotnet/sdk:5.0 AS build
-5.0: Pulling from dotnet/sdk
+Step 1/24 : FROM mcr.microsoft.com/dotnet/sdk:7.0 AS build
+7.0: Pulling from dotnet/sdk
 Digest: sha256:02606610ffd96978da91adeac1b73af9ac536b85a3034b061d0c7d8d9fcd6790
-Status: Image is up to date for mcr.microsoft.com/dotnet/sdk:5.0
+Status: Image is up to date for mcr.microsoft.com/dotnet/sdk:7.0
  ---> 9817c25953a8
 Step 17/24 : RUN dotnet test --logger:trx
  ---> Running in 4678e2e6456d
@@ -168,16 +174,16 @@ Step 17/24 : RUN dotnet test --logger:trx
   2 of 3 projects are up-to-date for restore.
   libbar -> /source/libbar/bin/Debug/netstandard2.0/libbar.dll
   libfoo -> /source/libfoo/bin/Debug/netstandard2.0/libfoo.dll
-  tests -> /source/tests/bin/Debug/net5.0/tests.dll
-Test run for /source/tests/bin/Debug/net5.0/tests.dll (.NETCoreApp,Version=v5.0)
-Microsoft (R) Test Execution Command Line Tool Version 16.8.0
+  tests -> /source/tests/bin/Debug/net7.0/tests.dll
+Test run for /source/tests/bin/Debug/net7.0/tests.dll (.NETCoreApp,Version=v7.0)
+Microsoft (R) Test Execution Command Line Tool Version 17.0.0
 Copyright (c) Microsoft Corporation.  All rights reserved.
 
 Starting test execution, please wait...
 A total of 1 test files matched the specified pattern.
-Results File: /source/tests/TestResults/_886d04dbf347_2020-11-02_18_30_59.trx
+Results File: /source/tests/TestResults/_886d04dbf347_2021-09-02_18_30_59.trx
 
-Passed!  - Failed:     0, Passed:     2, Skipped:     0, Total:     2, Duration: 2 ms - /source/tests/bin/Debug/net5.0/tests.dll (net5.0)
+Passed!  - Failed:     0, Passed:     2, Skipped:     0, Total:     2, Duration: 2 ms - /source/tests/bin/Debug/net7.0/tests.dll (net7.0)
 Removing intermediate container 4678e2e6456d
  ---> 6deeeacdaaf2
 Step 24/24 : ENTRYPOINT ["dotnet","complexapp.dll"]
@@ -202,9 +208,9 @@ C:\git\dotnet-docker\samples\complexapp>dir TestResults
 
  Directory of C:\git\dotnet-docker\samples\complexapp\TestResults
 
-12/19/2019  02:41 PM    <DIR>          .
-12/19/2019  02:41 PM    <DIR>          ..
-12/19/2019  02:41 PM             3,635 _4678e2e6456d_2019-12-19_22_41_08.trx
+09/02/2021  02:41 PM    <DIR>          .
+09/02/2021  02:41 PM    <DIR>          ..
+09/02/2021  02:41 PM             3,635 _4678e2e6456d_2021-09-19_22_41_08.trx
 ```
 
 There are two problems with this approach. It is cumbersome and if tests fail, it is not possible to copy the logs from the intermediate container layer, since that layer won't exist. This limitation, and the difficulty of copying files out of intermediate layers, demonstrates the weakness of this approach.
