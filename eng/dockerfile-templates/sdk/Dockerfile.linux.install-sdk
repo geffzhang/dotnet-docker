@@ -6,11 +6,15 @@
         is-internal (optional): Whether the Dockerfile is targeting an internal build of the product.
         url-suffix (optional): Suffix string to append the end of the URL.
         installer-stage (optional): Name of the Dockerfile stage responsible for installation
-        is-rpm-install (optional): Whether to install RPM versus tarball ^
+        is-rpm-install (optional): Whether to install RPM versus tarball
+
+        Workaround for https://bugs.launchpad.net/ubuntu/+source/tar/+bug/2059734. Remove when fixed.
+        disable-first-run-experience (optional): Force skipping the first-run experience regardless of other conditions
+        no-version-env-var (optional): Force reading the from the versions file instead of using DOTNET_SDK_VERSION env var ^
 
     set dotnetVersion to join(slice(split(PRODUCT_VERSION, "."), 0, 2), ".") ^
     set isAlpine to find(OS_VERSION, "alpine") >= 0 ^
-    set isFullMariner to defined(match(OS_VERSION, "^cbl-mariner\d+\.\d+$")) ^
+    set isFullAzureLinux to defined(match(OS_VERSION, "^cbl-mariner\d+\.\d+$")) || defined(match(OS_VERSION, "^azurelinux\d+\.\d+$")) ^
     set platform to when(isAlpine, "linux-musl", "linux") ^
     set installDir to "/usr/share/dotnet" ^
     set url to cat(
@@ -18,7 +22,7 @@
         "/Sdk/$dotnet_sdk_version/dotnet-sdk-$dotnet_sdk_version-", platform, "-", ARCH_SHORT, ".tar.gz") ^
     set sdkVersionDir to when(ARGS["use-local-version-var"],
         "$sdk_version",
-        when(ARGS["is-internal"],
+        when(ARGS["is-internal"] || ARGS["no-version-env-var"],
             VARIABLES[cat("sdk|", dotnetVersion, "|build-version")]
             "$DOTNET_SDK_VERSION")) ^
     set isInternalStableBranding to ARGS["is-internal"] &&
@@ -111,7 +115,7 @@ if copyEnabled:{{InsertTemplate("../Dockerfile.linux.copy-files",
 }}# Install .NET SDK
 RUN {{if ARGS["use-local-version-var"]:sdk_version={{VARIABLES[cat("sdk|", dotnetVersion, "|build-version")]}} \
 {{
-if isFullMariner:    dotnet_version={{VARIABLES[cat("runtime|", dotnetVersion, "|build-version")]}} \
+if isFullAzureLinux:    dotnet_version={{VARIABLES[cat("runtime|", dotnetVersion, "|build-version")]}} \
     aspnet_version={{VARIABLES[cat("aspnet|", dotnetVersion, "|build-version")]}} \
 }}}}{{if ARGS["use-local-version-var"]:    && }}{{InsertTemplate("../Dockerfile.linux.download-and-install",
     [
@@ -119,6 +123,6 @@ if isFullMariner:    dotnet_version={{VARIABLES[cat("runtime|", dotnetVersion, "
         "skip-download": !downloadEnabled,
         "skip-install": !installEnabled,
         "install-dir": installDir,
-        "create-install-dir": !isFullMariner
-    ], "    ")}}{{if !ARGS["is-internal"] || (ARGS["is-rpm-install"] && installEnabled): \
+        "create-install-dir": !isFullAzureLinux
+    ], "    ")}}{{if !ARGS["disable-first-run-experience"] && (!ARGS["is-internal"] || (ARGS["is-rpm-install"] && installEnabled)): \
     {{InsertTemplate("Dockerfile.linux.first-run", ["append-cmd": "true"], "    ")}}}}

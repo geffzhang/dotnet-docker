@@ -31,23 +31,15 @@ namespace Microsoft.DotNet.Docker.Tests
 
         protected override DotNetImageRepo ImageRepo => DotNetImageRepo.SDK;
 
-        private bool IsPowerShellSupported(ProductImageData imageData, out string reason)
+        private static bool IsPowerShellSupported(ProductImageData imageData, out string reason)
         {
-            if (imageData.OS.Contains("alpine"))
+            if (imageData.OS.Contains("alpine") && imageData.IsArm)
             {
-                if (imageData.IsArm)
-                {
-                    reason = "PowerShell does not support Arm-based Alpine, skip testing (https://github.com/PowerShell/PowerShell/issues/14667, https://github.com/PowerShell/PowerShell/issues/12937)";
-                    return false;
-                }
-                else if (imageData.Version.Major == 6 && imageData.OS.Contains("3.19"))
-                {
-                    reason = "Powershell does not support Alpine 3.19 yet, skip testing (https://github.com/PowerShell/PowerShell/issues/20945)";
-                    return false;
-                }
+                reason = "PowerShell does not support Arm-based Alpine, skip testing (https://github.com/PowerShell/PowerShell/issues/14667, https://github.com/PowerShell/PowerShell/issues/12937)";
+                return false;
             }
 
-            reason = null;
+            reason = "";
             return true;
         }
 
@@ -84,7 +76,7 @@ namespace Microsoft.DotNet.Docker.Tests
 
             // `wasm-tools` workload does not work on ARM
             // `wasm-tools` is also not supported on Alpine for .NET < 9 due to https://github.com/dotnet/sdk/issues/32327
-            int[] unsupportedVersionsForAlpine = [6, 7, 8];
+            int[] unsupportedVersionsForAlpine = [6, 8];
             bool isSupportedVersionForAlpine = !unsupportedVersionsForAlpine.Contains(imageData.Version.Major);
             bool useWasmTools = !imageData.IsArm && (!isAlpine || isSupportedVersionForAlpine);
 
@@ -173,7 +165,7 @@ namespace Microsoft.DotNet.Docker.Tests
 
             // Skip test on CBL-Mariner. Since installation is done via RPM package, we just need to verify the package installation
             // was done (handled by VerifyPackageInstallation test). There's no need to check the actual contents of the package.
-            if (imageData.OS.Contains("cbl-mariner"))
+            if (imageData.OS.StartsWith(OS.Mariner) || imageData.OS.StartsWith(OS.AzureLinux))
             {
                 return;
             }
@@ -227,11 +219,6 @@ namespace Microsoft.DotNet.Docker.Tests
         [MemberData(nameof(GetImageData))]
         public void VerifyInstalledRpmPackages(ProductImageData imageData)
         {
-            if (!imageData.OS.Contains("cbl-mariner") || imageData.IsDistroless || imageData.Version.Major > 6)
-            {
-                return;
-            }
-
             VerifyExpectedInstalledRpmPackages(
                 imageData,
                 new string[]
@@ -268,7 +255,7 @@ namespace Microsoft.DotNet.Docker.Tests
         {
             if (!DockerHelper.IsLinuxContainerModeEnabled && imageData.Version.Major == 6)
             {
-                OutputHelper.WriteLine("Git is not installed on Windows containers older than .NET 7");
+                OutputHelper.WriteLine("Git is not installed on Windows containers older than .NET 6");
                 return;
             }
 
